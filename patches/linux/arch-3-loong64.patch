@@ -1,0 +1,92 @@
+diff --git a/build/gulpfile.reh.js b/build/gulpfile.reh.js
+index e284026..52f9a12 100644
+--- a/build/gulpfile.reh.js
++++ b/build/gulpfile.reh.js
+@@ -52,2 +52,3 @@ const BUILD_TARGETS = [
+ 	{ platform: 'linux', arch: 'riscv64' },
++	{ platform: 'linux', arch: 'loong64' },
+ 	{ platform: 'alpine', arch: 'arm64' },
+diff --git a/build/gulpfile.scan.js b/build/gulpfile.scan.js
+index 66c8e1f..8a8c1eb 100644
+--- a/build/gulpfile.scan.js
++++ b/build/gulpfile.scan.js
+@@ -28,2 +28,3 @@ const BUILD_TARGETS = [
+ 	{ platform: 'linux', arch: 'riscv64' },
++	{ platform: 'linux', arch: 'loong64' },
+ ];
+diff --git a/build/gulpfile.vscode.js b/build/gulpfile.vscode.js
+index f0614d0..1438867 100644
+--- a/build/gulpfile.vscode.js
++++ b/build/gulpfile.vscode.js
+@@ -493,2 +493,3 @@ const BUILD_TARGETS = [
+ 	{ platform: 'linux', arch: 'riscv64' },
++	{ platform: 'linux', arch: 'loong64' },
+ ];
+diff --git a/cli/src/update_service.rs b/cli/src/update_service.rs
+index 4f2c8c2..4ea1bd2 100644
+--- a/cli/src/update_service.rs
++++ b/cli/src/update_service.rs
+@@ -178,2 +178,3 @@ pub enum Platform {
+ 	LinuxRISCV64,
++	LinuxLoong64,
+ 	DarwinX64,
+@@ -198,2 +199,3 @@ impl Platform {
+ 			Platform::LinuxRISCV64 => "riscv64",
++			Platform::LinuxLoong64 => "loong64",
+ 			Platform::DarwinX64 => "x64",
+@@ -219,2 +221,3 @@ impl Platform {
+ 			Platform::LinuxRISCV64 => "linux",
++			Platform::LinuxLoong64 => "linux",
+ 			Platform::DarwinX64 => "darwin",
+@@ -251,2 +254,4 @@ impl Platform {
+ 			Some(Platform::LinuxRISCV64)
++		} else if cfg!(all(target_os = "linux", target_arch = "loongarch64")) {
++			Some(Platform::LinuxLoong64)
+ 		} else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
+@@ -280,2 +285,3 @@ impl fmt::Display for Platform {
+ 			Platform::LinuxRISCV64 => "LinuxRISCV64",
++			Platform::LinuxLoong64 => "LinuxLoong64",
+ 			Platform::DarwinX64 => "DarwinX64",
+diff --git a/cli/src/util/prereqs.rs b/cli/src/util/prereqs.rs
+index 1a37552..ff191a1 100644
+--- a/cli/src/util/prereqs.rs
++++ b/cli/src/util/prereqs.rs
+@@ -86,2 +86,4 @@ impl PreReqChecker {
+ 					Platform::LinuxRISCV64
++				} else if cfg!(target_arch = "loongarch64") {
++					Platform::LinuxLoong64
+ 				} else {
+diff --git a/resources/server/bin/helpers/check-requirements-linux.sh b/resources/server/bin/helpers/check-requirements-linux.sh
+index b18e402..0b7aa4e 100644
+--- a/resources/server/bin/helpers/check-requirements-linux.sh
++++ b/resources/server/bin/helpers/check-requirements-linux.sh
+@@ -57,2 +57,3 @@ case $ARCH in
+ 	riscv64) LDCONFIG_ARCH="RISC-V";;
++    loongarch64) LDCONFIG_ARCH="double-float";;
+ esac
+diff --git a/src/vs/platform/extensionManagement/common/extensionManagement.ts b/src/vs/platform/extensionManagement/common/extensionManagement.ts
+index be95b04..1a0decd 100644
+--- a/src/vs/platform/extensionManagement/common/extensionManagement.ts
++++ b/src/vs/platform/extensionManagement/common/extensionManagement.ts
+@@ -46,2 +46,3 @@ export function TargetPlatformToString(targetPlatform: TargetPlatform) {
+ 		case TargetPlatform.LINUX_RISCV64: return 'Linux RISC-V 64';
++		case TargetPlatform.LINUX_LOONG64: return 'Linux Loong64';
+ 
+@@ -71,2 +72,3 @@ export function toTargetPlatform(targetPlatform: string): TargetPlatform {
+ 		case TargetPlatform.LINUX_RISCV64: return TargetPlatform.LINUX_RISCV64;
++		case TargetPlatform.LINUX_LOONG64: return TargetPlatform.LINUX_LOONG64;
+ 
+@@ -112,2 +114,5 @@ export function getTargetPlatform(platform: Platform | 'alpine', arch: string |
+ 			}
++			if (arch === 'loong64') {
++				return TargetPlatform.LINUX_LOONG64;
++			}
+ 			return TargetPlatform.UNKNOWN;
+diff --git a/src/vs/platform/extensions/common/extensions.ts b/src/vs/platform/extensions/common/extensions.ts
+index 10152de..3eb0412 100644
+--- a/src/vs/platform/extensions/common/extensions.ts
++++ b/src/vs/platform/extensions/common/extensions.ts
+@@ -321,2 +321,3 @@ export const enum TargetPlatform {
+ 	LINUX_RISCV64 = 'linux-riscv64',
++	LINUX_LOONG64 = 'linux-loong64',
+ 
