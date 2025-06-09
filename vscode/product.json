@@ -1,6 +1,6 @@
 {
   "nameShort": "Lean4Code",
-  "nameLong": "Lean4Code_CodeEditor",
+  "nameLong": "Lean4Code",
   "applicationName": "lean4code",
   "dataFolderName": ".vscode-oss",
   "win32MutexName": "vscodium",
