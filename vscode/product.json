@@ -33,6 +33,12 @@
   "nodejsRepository": "https://nodejs.org",
   "urlProtocol": "lean4code",
   "webviewContentExternalBaseUrlTemplate": "https://{{uuid}}.vscode-cdn.net/insider/ef65ac1ba57f57f2a3961bfe94aa20481caca4c6/out/vs/workbench/contrib/webview/browser/pre/",
+  "builtinExtensions": [
+  {
+    "name": "lean4",
+    "version": "0.0.205"
+  }
+],
   "builtInExtensions": [
     {
       "name": "ms-vscode.js-debug-companion",
