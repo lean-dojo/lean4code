@@ -354,7 +354,7 @@
 		]
 	},
 	"view.workbench.scm.disabled": {
-		"message": "If you would like to use Git features, please enable Git in your [settings](command:workbench.action.openSettings?%5B%22git.enabled%22%5D).\nTo learn more about how to use Git and source control in VSCodium [read our docs](https://aka.ms/vscode-scm).",
+		"message": "If you would like to use Git features, please enable Git in your [settings](command:workbench.action.openSettings?%5B%22git.enabled%22%5D).\nTo learn more about how to use Git and source control in Lean4Code [read the VSCodium Docs](https://aka.ms/vscode-scm).",
 		"comment": [
 			"{Locked='](command:workbench.action.openSettings?%5B%22git.enabled%22%5D'}",
 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VSCodium",
@@ -362,7 +362,7 @@
 		]
 	},
 	"view.workbench.scm.empty": {
-		"message": "In order to use Git features, you can open a folder containing a Git repository or clone from a URL.\n[Open Folder](command:vscode.openFolder)\n[Clone Repository](command:git.cloneRecursive)\nTo learn more about how to use Git and source control in VSCodium [read our docs](https://aka.ms/vscode-scm).",
+		"message": "In order to use Git features, you can open a folder containing a Git repository or clone from a URL.\n[Open Folder](command:vscode.openFolder)\n[Clone Repository](command:git.cloneRecursive)\nTo learn more about how to use Git and source control in Lean4Code [read the VSCodium Docs](https://aka.ms/vscode-scm).",
 		"comment": [
 			"{Locked='](command:vscode.openFolder'}",
 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VSCodium",
@@ -370,7 +370,7 @@
 		]
 	},
 	"view.workbench.scm.folder": {
-		"message": "The folder currently open doesn't have a Git repository. You can initialize a repository which will enable source control features powered by Git.\n[Initialize Repository](command:git.init?%5Btrue%5D)\nTo learn more about how to use Git and source control in VSCodium [read our docs](https://aka.ms/vscode-scm).",
+		"message": "The folder currently open doesn't have a Git repository. You can initialize a repository which will enable source control features powered by Git.\n[Initialize Repository](command:git.init?%5Btrue%5D)\nTo learn more about how to use Git and source control in Lean4Code [read the VSCodium Docs](https://aka.ms/vscode-scm).",
 		"comment": [
 			"{Locked='](command:git.init?%5Btrue%5D'}",
 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VSCodium",
@@ -378,7 +378,7 @@
 		]
 	},
 	"view.workbench.scm.workspace": {
-		"message": "The workspace currently open doesn't have any folders containing Git repositories. You can initialize a repository on a folder which will enable source control features powered by Git.\n[Initialize Repository](command:git.init)\nTo learn more about how to use Git and source control in VSCodium [read our docs](https://aka.ms/vscode-scm).",
+		"message": "The workspace currently open doesn't have any folders containing Git repositories. You can initialize a repository on a folder which will enable source control features powered by Git.\n[Initialize Repository](command:git.init)\nTo learn more about how to use Git and source control in Lean4Code [read the VSCodium Docs](https://aka.ms/vscode-scm).",
 		"comment": [
 			"{Locked='](command:git.init'}",
 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VSCodium",
@@ -386,7 +386,7 @@
 		]
 	},
 	"view.workbench.scm.emptyWorkspace": {
-		"message": "The workspace currently open doesn't have any folders containing Git repositories.\n[Add Folder to Workspace](command:workbench.action.addRootFolder)\nTo learn more about how to use Git and source control in VSCodium [read our docs](https://aka.ms/vscode-scm).",
+		"message": "The workspace currently open doesn't have any folders containing Git repositories.\n[Add Folder to Workspace](command:workbench.action.addRootFolder)\nTo learn more about how to use Git and source control in Lean4Code [read the VSCodium docs](https://aka.ms/vscode-scm).",
 		"comment": [
 			"{Locked='](command:workbench.action.addRootFolder'}",
 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VSCodium",
@@ -400,7 +400,7 @@
 		"message": "Scanning workspace for Git repositories..."
 	},
 	"view.workbench.scm.repositoryInParentFolders": {
-		"message": "A Git repository was found in the parent folders of the workspace or the open file(s).\n[Open Repository](command:git.openRepositoriesInParentFolders)\nUse the [git.openRepositoryInParentFolders](command:workbench.action.openSettings?%5B%22git.openRepositoryInParentFolders%22%5D) setting to control whether Git repositories in parent folders of workspaces or open files are opened. To learn more [read our docs](https://aka.ms/vscode-git-repository-in-parent-folders).",
+		"message": "A Git repository was found in the parent folders of the workspace or the open file(s).\n[Open Repository](command:git.openRepositoriesInParentFolders)\nUse the [git.openRepositoryInParentFolders](command:workbench.action.openSettings?%5B%22git.openRepositoryInParentFolders%22%5D) setting to control whether Git repositories in parent folders of workspaces or open files are opened. To learn more [read the VSCodium Docs](https://aka.ms/vscode-git-repository-in-parent-folders).",
 		"comment": [
 			"{Locked='](command:git.openRepositoriesInParentFolders'}",
 			"{Locked='](command:workbench.action.openSettings?%5B%22git.openRepositoryInParentFolders%22%5D'}",
@@ -409,7 +409,7 @@
 		]
 	},
 	"view.workbench.scm.repositoriesInParentFolders": {
-		"message": "Git repositories were found in the parent folders of the workspace or the open file(s).\n[Open Repository](command:git.openRepositoriesInParentFolders)\nUse the [git.openRepositoryInParentFolders](command:workbench.action.openSettings?%5B%22git.openRepositoryInParentFolders%22%5D) setting to control whether Git repositories in parent folders of workspace or open files are opened. To learn more [read our docs](https://aka.ms/vscode-git-repository-in-parent-folders).",
+		"message": "Git repositories were found in the parent folders of the workspace or the open file(s).\n[Open Repository](command:git.openRepositoriesInParentFolders)\nUse the [git.openRepositoryInParentFolders](command:workbench.action.openSettings?%5B%22git.openRepositoryInParentFolders%22%5D) setting to control whether Git repositories in parent folders of workspace or open files are opened. To learn more [read the VSCodium Docs](https://aka.ms/vscode-git-repository-in-parent-folders).",
 		"comment": [
 			"{Locked='](command:git.openRepositoriesInParentFolders'}",
 			"{Locked='](command:workbench.action.openSettings?%5B%22git.openRepositoryInParentFolders%22%5D'}",
@@ -418,7 +418,7 @@
 		]
 	},
 	"view.workbench.scm.unsafeRepository": {
-		"message": "The detected Git repository is potentially unsafe as the folder is owned by someone other than the current user.\n[Manage Unsafe Repositories](command:git.manageUnsafeRepositories)\nTo learn more about unsafe repositories [read our docs](https://aka.ms/vscode-git-unsafe-repository).",
+		"message": "The detected Git repository is potentially unsafe as the folder is owned by someone other than the current user.\n[Manage Unsafe Repositories](command:git.manageUnsafeRepositories)\nTo learn more about unsafe repositories [read the VSCodium Docs](https://aka.ms/vscode-git-unsafe-repository).",
 		"comment": [
 			"{Locked='](command:git.manageUnsafeRepositories'}",
 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VSCodium",
@@ -426,7 +426,7 @@
 		]
 	},
 	"view.workbench.scm.unsafeRepositories": {
-		"message": "The detected Git repositories are potentially unsafe as the folders are owned by someone other than the current user.\n[Manage Unsafe Repositories](command:git.manageUnsafeRepositories)\nTo learn more about unsafe repositories [read our docs](https://aka.ms/vscode-git-unsafe-repository).",
+		"message": "The detected Git repositories are potentially unsafe as the folders are owned by someone other than the current user.\n[Manage Unsafe Repositories](command:git.manageUnsafeRepositories)\nTo learn more about unsafe repositories [read the VSCodium Docs](https://aka.ms/vscode-git-unsafe-repository).",
 		"comment": [
 			"{Locked='](command:git.manageUnsafeRepositories'}",
 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VSCodium",
@@ -434,7 +434,7 @@
 		]
 	},
 	"view.workbench.scm.closedRepository": {
-		"message": "A Git repository was found that was previously closed.\n[Reopen Closed Repository](command:git.reopenClosedRepositories)\nTo learn more about how to use Git and source control in VSCodium [read our docs](https://aka.ms/vscode-scm).",
+		"message": "A Git repository was found that was previously closed.\n[Reopen Closed Repository](command:git.reopenClosedRepositories)\nTo learn more about how to use Git and source control in Lean4Code [read the VSCodium Docs](https://aka.ms/vscode-scm).",
 		"comment": [
 			"{Locked='](command:git.reopenClosedRepositories'}",
 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VSCodium",
@@ -442,7 +442,7 @@
 		]
 	},
 	"view.workbench.scm.closedRepositories": {
-		"message": "Git repositories were found that were previously closed.\n[Reopen Closed Repositories](command:git.reopenClosedRepositories)\nTo learn more about how to use Git and source control in VSCodium [read our docs](https://aka.ms/vscode-scm).",
+		"message": "Git repositories were found that were previously closed.\n[Reopen Closed Repositories](command:git.reopenClosedRepositories)\nTo learn more about how to use Git and source control in Lean4Code [read the VSCodium Docs](https://aka.ms/vscode-scm).",
 		"comment": [
 			"{Locked='](command:git.reopenClosedRepositories'}",
 			"Do not translate the 'command:*' part inside of the '(..)'. It is an internal command syntax for VSCodium",
@@ -457,5 +457,5 @@
 			"Please make sure there is no space between the right bracket and left parenthesis:  ]( this is an internal syntax for links"
 		]
 	},
-	"view.workbench.learnMore": "To learn more about how to use Git and source control in VSCodium [read our docs](https://aka.ms/vscode-scm)."
+	"view.workbench.learnMore": "To learn more about how to use Git and source control in Lean4Code [read the VSCodium Docs](https://aka.ms/vscode-scm)."
 }
