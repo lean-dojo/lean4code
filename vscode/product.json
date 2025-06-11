@@ -92,8 +92,8 @@
   "checksumFailMoreInfoUrl": "https://go.microsoft.com/fwlink/?LinkId=828886",
   "documentationUrl": "https://go.microsoft.com/fwlink/?LinkID=533484#vscode",
   "extensionsGallery": {
-    "serviceUrl": "https://open-vsx.org/vscode/gallery",
-    "itemUrl": "https://open-vsx.org/vscode/item",
+    "serviceUrl": "",
+    "itemUrl": "",
     "extensionUrlTemplate": "https://open-vsx.org/vscode/gallery/{publisher}/{name}/latest",
     "controlUrl": "https://raw.githubusercontent.com/EclipseFdn/publish-extensions/refs/heads/master/extension-control/extensions.json"
   },
