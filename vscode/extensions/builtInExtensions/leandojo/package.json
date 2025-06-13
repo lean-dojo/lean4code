@@ -37,7 +37,8 @@
     ]
   },
   "scripts": {
-    "compile": "tsc -p ."
+    "compile": "tsc -p .",
+    "webpack": "webpack"
   },
   "devDependencies": {
     "@types/vscode": "^1.89.0",
