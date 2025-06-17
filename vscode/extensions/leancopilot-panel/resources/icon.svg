@@ -1,0 +1,8 @@
+<svg width="24" height="24" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Horizontal beam (roof) -->
+  <rect x="30" y="50" width="140" height="10" fill="currentColor" />
+
+  <!-- Support columns -->
+  <rect x="40" y="60" width="10" height="80" fill="currentColor" />
+  <rect x="150" y="60" width="10" height="80" fill="currentColor" />
+</svg> 

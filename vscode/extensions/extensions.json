@@ -1,5 +1,6 @@
 {
   "built-in": [
-    "custom/LeanDojo"
+    "custom/LeanDojo",
+    "custom/LeanCopilot"
   ]
 }
