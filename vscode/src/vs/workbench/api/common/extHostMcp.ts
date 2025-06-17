@@ -132,8 +132,9 @@ export class ExtHostMcpService extends Disposable implements IExtHostMpcService 
 			this._proxy.$deleteMcpCollection(mcp.id);
 		}));
 
-		if (provider.onDidChangeServerDefinitions) {
-			store.add(provider.onDidChangeServerDefinitions(update));
+		if (provider.onDidChangeMcpServerDefinitions
+		) {
+			store.add(provider.onDidChangeMcpServerDefinitions(update));
 		}
 		// todo@connor4312: proposed API back-compat
 		if ((provider as any).onDidChange) {

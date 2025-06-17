@@ -1528,7 +1528,7 @@ export function createApiFactoryAndRegisterActors(accessor: ServicesAccessor): I
 				return extHostLanguageModels.registerIgnoredFileProvider(extension, provider);
 			},
 			registerMcpServerDefinitionProvider(id, provider) {
-				checkProposedApiEnabled(extension, 'mcpConfigurationProvider');
+				//checkProposedApiEnabled(extension, 'mcpConfigurationProvider');
 				return extHostMcp.registerMcpConfigurationProvider(extension, id, provider);
 			}
 		};
