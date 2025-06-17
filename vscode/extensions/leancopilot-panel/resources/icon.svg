@@ -1,8 +1,18 @@
 <svg width="24" height="24" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-  <!-- Horizontal beam (roof) -->
-  <rect x="30" y="50" width="140" height="10" fill="currentColor" />
+  <!-- Robot head (square) -->
+  <rect x="50" y="50" width="100" height="100" rx="10" ry="10" stroke="currentColor" stroke-width="10" fill="none" />
 
-  <!-- Support columns -->
-  <rect x="40" y="60" width="10" height="80" fill="currentColor" />
-  <rect x="150" y="60" width="10" height="80" fill="currentColor" />
+  <!-- Eyes (hollow circles) -->
+  <circle cx="80" cy="90" r="10" stroke="currentColor" stroke-width="10" fill="none" />
+  <circle cx="120" cy="90" r="10" stroke="currentColor" stroke-width="10" fill="none" />
+
+  <!-- Straight line mouth -->
+  <line x1="85" y1="135" x2="115" y2="135" stroke="currentColor" stroke-width="6" stroke-linecap="round" />
+
+  <!-- Antenna (line only) -->
+  <line x1="100" y1="30" x2="100" y2="50" stroke="currentColor" stroke-width="10" />
+
+  <!-- Side ears -->
+  <rect x="40" y="80" width="10" height="40" fill="currentColor" />
+  <rect x="150" y="80" width="10" height="40" fill="currentColor" />
 </svg> 
