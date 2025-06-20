@@ -1,17 +1,18 @@
 {
   "name": "leancopilot-panel",
   "displayName": "LeanCopilot Panel",
-  "description": "A custom panel for LeanCopilot",
+  "description": "Sidebar panel to set up LeanCopilot",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.60.0"
   },
   "main": "./out/extension.js",
   "categories": ["Other"],
-  "activationEvents": [
-    "onView:leanCopilotPanel",
-    "onCommand:leanCopilot.setupToml"
-  ],
+ "activationEvents": [
+  "onView:leanCopilotPanel",
+  "onCommand:leanCopilot.setupToml",
+  "onCommand:leanCopilotPanel.refresh"
+],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
@@ -39,19 +40,13 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
+    "watch": "tsc -w -p ./",
+    "vscode:prepublish": "npm run compile"
   },
   "devDependencies": {
     "@types/node": "^16.11.7",
     "@types/vscode": "^1.60.0",
-    "@typescript-eslint/eslint-plugin": "^5.30.0",
-    "@typescript-eslint/parser": "^5.30.0",
-    "eslint": "^8.13.0",
     "typescript": "^4.7.2"
   }
 }
