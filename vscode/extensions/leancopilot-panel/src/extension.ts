@@ -3,9 +3,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { exec } from 'child_process';
 
+let panelInstance: LeanCopilotPanel;
+
 export function activate(context: vscode.ExtensionContext) {
+  panelInstance = new LeanCopilotPanel(context);
+
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('leanCopilotPanel', new LeanCopilotPanel(context))
+    vscode.window.registerWebviewViewProvider('leanCopilotPanel', panelInstance)
   );
 
   context.subscriptions.push(
@@ -66,6 +70,8 @@ moreLinkArgs = [
         });
 
       try {
+        panelInstance.updateWebviewDownloading();
+
         await run('lake update LeanCopilot', '📦 Running: lake update LeanCopilot...');
         await run('lake exe LeanCopilot/download', '⬇️ Downloading models...');
         await run('lake build', '🔧 Building project...');
@@ -81,9 +87,12 @@ moreLinkArgs = [
 }
 
 class LeanCopilotPanel implements vscode.WebviewViewProvider {
+  private _view?: vscode.WebviewView;
+
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   resolveWebviewView(view: vscode.WebviewView): void {
+    this._view = view;
     view.webview.options = { enableScripts: true };
 
     const installed = this.context.workspaceState.get('leanCopilotInstalled') === true;
@@ -91,22 +100,58 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
 
     view.webview.onDidReceiveMessage(msg => {
       if (msg.command === 'setup') {
+        this.updateWebviewDownloading();
         vscode.commands.executeCommand('leanCopilot.setupToml');
       }
     });
 
     vscode.commands.registerCommand('leanCopilotPanel.refresh', () => {
       const installedNow = this.context.workspaceState.get('leanCopilotInstalled') === true;
-      view.webview.html = this.getHtml(installedNow);
+      if (this._view) {
+        this._view.webview.html = this.getHtml(installedNow);
+      }
     });
+  }
+
+  public updateWebviewDownloading() {
+    if (this._view) {
+      this._view.webview.html = `
+        <html>
+        <body style="display:flex;align-items:center;justify-content:center;height:100vh;">
+          <h3>⏳ Downloading LeanCopilot extension, please wait...</h3>
+        </body>
+        </html>
+      `;
+    }
   }
 
   private getHtml(installed: boolean): string {
     if (installed) {
       return `
         <html>
-        <body style="display:flex;align-items:center;justify-content:center;height:100vh;">
+        <head>
+          <style>
+            body {
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              margin: 0;
+              background: var(--vscode-sideBar-background);
+              color: var(--vscode-sideBar-foreground);
+              font-family: sans-serif;
+            }
+            .small {
+              font-size: 0.9rem;
+              margin-top: 1rem;
+              color: var(--vscode-descriptionForeground);
+            }
+          </style>
+        </head>
+        <body>
           <h2>🤖 LeanCopilot installed!</h2>
+          <div class="small">Add "import LeanCopilot" to the top of your Lean file to get started</div>
         </body>
         </html>
       `;
