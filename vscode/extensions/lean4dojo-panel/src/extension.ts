@@ -16,6 +16,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 class LeanDojoPanel implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
+  private _projectBuilt: boolean = false;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -31,6 +32,8 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
         this.handleInstallLeanDojo();
       } else if (msg.command === 'buildProject') {
         this.handleBuildProject();
+      } else if (msg.command === 'traceProject') {
+        this.handleTraceProject();
       }
     });
   }
@@ -274,11 +277,36 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       await this.runBuildCommand(workspacePath);
       vscode.window.showInformationMessage('✅ Project built successfully!');
       
-      // Update the webview to show built state
+      // Set the built flag and update the webview
+      this._projectBuilt = true;
       this.updateWebviewBuilt();
       
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to build project: ${error.message}`);
+    }
+  }
+
+  private async handleTraceProject() {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      vscode.window.showErrorMessage('No workspace folder found');
+      return;
+    }
+
+    const workspacePath = workspaceFolder.uri.fsPath;
+    const venvPath = path.join(workspacePath, '.leandojo_env');
+
+    if (!fs.existsSync(venvPath)) {
+      vscode.window.showErrorMessage('LeanDojo is not installed in this repository');
+      return;
+    }
+
+    try {
+      vscode.window.showInformationMessage('Tracing project...');
+      await this.runTraceCommand(venvPath, workspacePath);
+      vscode.window.showInformationMessage('✅ Project traced successfully!');
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to trace project: ${error.message}`);
     }
   }
 
@@ -294,6 +322,29 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     });
   }
 
+  private runTraceCommand(venvPath: string, workspacePath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Create the simplest possible Python script
+      const scriptPath = path.join(workspacePath, 'trace.py');
+      const scriptContent = `from lean_dojo import *
+import subprocess
+
+remote_url = subprocess.check_output(['git', 'config', '--get', 'remote.origin.url'], text=True).strip()
+commit_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+
+repo = LeanGitRepo(remote_url, commit_hash)
+traced_repo = trace(repo)
+print("Done!")
+`;
+
+      // Write the script file
+      fs.writeFileSync(scriptPath, scriptContent);
+      
+      vscode.window.showInformationMessage('✅ Python file created: trace.py');
+      resolve();
+    });
+  }
+
   private updateWebviewBuilt() {
     if (this._view) {
       this._view.webview.html = this.getHtml();
@@ -303,11 +354,10 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
   private getHtml(): string {
     const isCloned = this.isClonedRepository();
     const isInstalled = this.isLeanDojoInstalled();
-    const isBuilt = this.isProjectBuilt();
 
     if (isCloned) {
       if (isInstalled) {
-        if (isBuilt) {
+        if (this._projectBuilt) {
           return this.getBuiltHtml();
         } else {
           return this.getInstalledHtml();
@@ -482,6 +532,20 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
             max-width: 300px;
             text-align: center;
           }
+          button {
+            width: 100%;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 1rem;
+          }
+          button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+          }
           .status {
             font-size: 0.8rem;
             color: var(--vscode-descriptionForeground);
@@ -495,7 +559,18 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
           <div class="status">
             ✅ Project built successfully
           </div>
+          <button onclick="traceProject()">Trace Project</button>
         </div>
+        
+        <script>
+          const vscode = acquireVsCodeApi();
+          
+          function traceProject() {
+            vscode.postMessage({ 
+              command: 'traceProject'
+            });
+          }
+        </script>
       </body>
       </html>
     `;
