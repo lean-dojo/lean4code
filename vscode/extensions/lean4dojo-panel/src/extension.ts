@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { exec } from 'child_process';
+import * as path from 'path';
+import * as fs from 'fs';
 
 let panelInstance: LeanDojoPanel;
 
@@ -13,20 +15,23 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('leanDojo.install', async () => {
       try {
-        vscode.window.showInformationMessage('📦 Checking Python version...');
+        vscode.window.showInformationMessage('🐍 Checking Python version...');
         panelInstance.updateWebviewInstalling();
 
-        // Check Python version first
+        // Check Python version - LeanDojo requires >=3.9, <3.12
         const pythonVersion = await getPythonVersion();
-        if (pythonVersion >= 3.12) {
-          vscode.window.showInformationMessage('🐍 Installing Python 3.11...');
-          await installPython311();
+        if (pythonVersion < 3.9 || pythonVersion >= 3.12) {
+          vscode.window.showInformationMessage('🐍 Installing compatible Python version...');
+          await installCompatiblePython();
         }
 
-        vscode.window.showInformationMessage('📦 Installing LeanDojo...');
-        await installLeanDojo();
+        vscode.window.showInformationMessage('📦 Creating virtual environment...');
+        await createVirtualEnvironment();
         
-        vscode.window.showInformationMessage('✅ LeanDojo installed successfully!');
+        vscode.window.showInformationMessage('📦 Installing LeanDojo in virtual environment...');
+        await installLeanDojoInVenv();
+        
+        vscode.window.showInformationMessage('✅ LeanDojo installed successfully in virtual environment!');
         context.workspaceState.update('leanDojoInstalled', true);
         panelInstance.updateWebviewInstalled();
 
@@ -34,8 +39,10 @@ export function activate(context: vscode.ExtensionContext) {
         const errorMsg = `❌ Failed to install LeanDojo: ${error.message}
 
 Please install manually:
-1. Install Python 3.11: brew install python@3.11
-2. Install LeanDojo: pip3 install lean-dojo`;
+1. Install Python 3.9-3.11: brew install python@3.10
+2. Create virtual environment: python3 -m venv .leandojo_env
+3. Activate virtual environment: source .leandojo_env/bin/activate (macOS/Linux) or .leandojo_env\\Scripts\\activate (Windows)
+4. Install LeanDojo: pip install lean-dojo`;
         
         vscode.window.showErrorMessage(errorMsg);
         panelInstance.updateWebviewError(errorMsg);
@@ -57,46 +64,114 @@ async function getPythonVersion(): Promise<number> {
   }
 }
 
-async function installPython311(): Promise<void> {
+async function installCompatiblePython(): Promise<void> {
   try {
-    // Try to install Python 3.11 using Homebrew
-    await runCommand('brew install python@3.11');
-    
-    // Create a symlink to make python3.11 available as python3
-    try {
-      await runCommand('brew link python@3.11 --force');
-    } catch (linkError) {
-      // If linking fails, that's okay - we can still use python3.11 directly
-      console.log('Could not link Python 3.11, will use python3.11 directly');
+    // Try to install a compatible Python version (3.9-3.11)
+    if (process.platform === 'darwin') {
+      // Try Python 3.10 first, then 3.11
+      try {
+        await runCommand('brew install python@3.10');
+        try {
+          await runCommand('brew link python@3.10 --force');
+        } catch (linkError) {
+          console.log('Could not link Python 3.10, will use python3.10 directly');
+        }
+      } catch (error) {
+        // If 3.10 fails, try 3.11
+        await runCommand('brew install python@3.11');
+        try {
+          await runCommand('brew link python@3.11 --force');
+        } catch (linkError) {
+          console.log('Could not link Python 3.11, will use python3.11 directly');
+        }
+      }
+    } else if (process.platform === 'win32') {
+      // For Windows, we'll assume Python 3.10 is available or guide user to install
+      throw new Error('Please install Python 3.9-3.11 from https://www.python.org/downloads/');
+    } else {
+      // For Linux, try apt or yum
+      try {
+        await runCommand('sudo apt update && sudo apt install python3.10 python3.10-venv -y');
+      } catch (aptError) {
+        try {
+          await runCommand('sudo apt install python3.11 python3.11-venv -y');
+        } catch (aptError2) {
+          try {
+            await runCommand('sudo yum install python3.10 python3.10-venv -y');
+          } catch (yumError) {
+            try {
+              await runCommand('sudo yum install python3.11 python3.11-venv -y');
+            } catch (yumError2) {
+              throw new Error('Please install Python 3.9-3.11 manually for your Linux distribution');
+            }
+          }
+        }
+      }
     }
   } catch (error: any) {
-    throw new Error(`Failed to install Python 3.11: ${error.message}`);
+    throw new Error(`Failed to install compatible Python version: ${error.message}`);
   }
 }
 
-async function installLeanDojo(): Promise<void> {
+async function createVirtualEnvironment(): Promise<void> {
   try {
-    // Try different Python commands to install LeanDojo
-    const pythonCommands = [
-      'python3.11 -m pip install lean-dojo',
-      'python3 -m pip install lean-dojo',
-      'pip3.11 install lean-dojo',
-      'pip3 install lean-dojo'
-    ];
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      throw new Error('No workspace folder found');
+    }
 
-    for (const cmd of pythonCommands) {
+    const venvPath = path.join(workspaceFolder.uri.fsPath, '.leandojo_env');
+    
+    // Check if virtual environment already exists
+    if (fs.existsSync(venvPath)) {
+      console.log('Virtual environment already exists');
+      return;
+    }
+
+    // Try different Python commands to create virtual environment
+    const pythonCommands = ['python3.10', 'python3.9', 'python3'];
+    
+    for (const pythonCmd of pythonCommands) {
       try {
-        await runCommand(cmd);
+        await runCommand(`${pythonCmd} -m venv "${venvPath}"`);
+        console.log(`Successfully created virtual environment with ${pythonCmd}`);
         return; // Success, exit
       } catch (error: any) {
-        console.log(`Failed with ${cmd}: ${error}`);
+        console.log(`Failed to create virtual environment with ${pythonCmd}: ${error.message}`);
         continue;
       }
     }
 
-    throw new Error('All Python installation methods failed');
+    throw new Error('Could not create virtual environment with any Python version');
   } catch (error: any) {
-    throw new Error(`Failed to install LeanDojo: ${error.message}`);
+    throw new Error(`Failed to create virtual environment: ${error.message}`);
+  }
+}
+
+async function installLeanDojoInVenv(): Promise<void> {
+  try {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      throw new Error('No workspace folder found');
+    }
+
+    const venvPath = path.join(workspaceFolder.uri.fsPath, '.leandojo_env');
+    
+    // Determine the pip path based on platform
+    let pipPath: string;
+    if (process.platform === 'win32') {
+      pipPath = path.join(venvPath, 'Scripts', 'pip');
+    } else {
+      pipPath = path.join(venvPath, 'bin', 'pip');
+    }
+
+    // First, upgrade pip in the virtual environment
+    await runCommand(`"${pipPath}" install --upgrade pip`);
+
+    // Install LeanDojo in the virtual environment
+    await runCommand(`"${pipPath}" install lean-dojo`);
+  } catch (error: any) {
+    throw new Error(`Failed to install LeanDojo in virtual environment: ${error.message}`);
   }
 }
 
