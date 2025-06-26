@@ -173,9 +173,86 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
   }
 
   private generateTraceCode(repoUrl: string, commitHash: string): string {
-    return `from lean_dojo import *
-repo = LeanGitRepo("${repoUrl}","${commitHash}")
-traced_repo = trace(repo)`;
+    return `import subprocess
+import shutil
+import os
+import json
+from pathlib import Path
+
+
+def write_status(message, status="info"):
+    status_file = "../out/status.json"
+    os.makedirs(os.path.dirname(status_file), exist_ok=True)
+    with open(status_file, "w") as f:
+        json.dump({
+            "message": message,
+            "status": status,
+            "timestamp": str(Path().cwd())
+        }, f, indent=2)
+    print(f"[{status.upper()}] {message}")
+
+
+def main():
+    write_status("🚀 Upgrading lean-dojo via pip...")
+
+    # Try multiple Python commands for pip upgrade
+    python_commands = ["python3.11", "python3", "python"]
+    pip_upgraded = False
+    for python_cmd in python_commands:
+        try:
+            subprocess.run([python_cmd, "-m", "pip", "install", "--upgrade", "lean-dojo"], check=False, capture_output=True)
+            pip_upgraded = True
+            write_status(f"✅ lean-dojo upgrade attempted using {python_cmd}")
+            break
+        except FileNotFoundError:
+            continue
+    if not pip_upgraded:
+        write_status("⚠️  Could not upgrade lean-dojo, continuing anyway...")
+
+    repo_path = "../repo"
+    write_status(f"Using repo folder: {repo_path}")
+
+    toolchain_file = os.path.join(repo_path, "lean-toolchain")
+    if os.path.isfile(toolchain_file):
+        lean_version = open(toolchain_file).read().strip()
+        write_status(f"Detected Lean version from lean-toolchain: {lean_version}")
+    else:
+        lean_version = "leanprover/lean4:nightly"
+        write_status(f"⚠️ No lean-toolchain found. Using fallback Lean version: {lean_version}")
+
+    if not shutil.which("elan"):
+        write_status("Installing elan via curl...")
+        subprocess.run("curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh", shell=True, check=True)
+
+    write_status("Ensuring Lean toolchain installed...")
+    subprocess.run(["elan", "install", lean_version], cwd=repo_path, check=False)
+    subprocess.run(["elan", "override", "set", lean_version], cwd=repo_path, check=True)
+
+    write_status("Building the repo with lake...")
+    subprocess.run(["lake", "build"], cwd=repo_path, check=True)
+
+    write_status("Starting LeanDojo trace...")
+    from lean_dojo import LeanGitRepo
+    from lean_dojo.data_extraction.trace import trace
+
+    repo = LeanGitRepo("${repoUrl}", "${commitHash}")
+    traced_path = trace(repo)
+    write_status("Trace complete! Copying output...", "success")
+
+    out = "../out"
+    if os.path.exists(out):
+        shutil.rmtree(out)
+    shutil.copytree(traced_path, out)
+    write_status("✅ Trace completed successfully", "success")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        write_status(f"🚨 Trace failed: {e}", "error")
+        raise
+`;
   }
 
   private async handleInstallPython(): Promise<void> {
