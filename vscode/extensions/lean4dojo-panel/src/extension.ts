@@ -23,6 +23,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 class LeanDojoPanel implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
+  private pythonInstalled: boolean = false;
+  private leanDojoInstalled: boolean = false;
+  private repoTraced: boolean = false;
+  private tracingInProgress: boolean = false;
+  private traceMessage: string = '';
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -78,6 +83,13 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     }
 
     try {
+      // Reset state for new project
+      this.pythonInstalled = false;
+      this.leanDojoInstalled = false;
+      this.repoTraced = false;
+      this.tracingInProgress = false;
+      this.traceMessage = '';
+
       // Create project folder on Desktop
       const desktopPath = path.join(os.homedir(), 'Desktop');
       const projectPath = path.join(desktopPath, projectName.trim());
@@ -191,6 +203,7 @@ traced_repo = trace(repo)`;
               return;
             }
             
+            this.pythonInstalled = true;
             vscode.window.showInformationMessage('✅ Python installed successfully');
             // Update panel to show next button
             setTimeout(() => {
@@ -215,6 +228,7 @@ traced_repo = trace(repo)`;
                 return;
               }
               
+              this.pythonInstalled = true;
               vscode.window.showInformationMessage('✅ Python installed successfully');
               // Update panel to show next button
               setTimeout(() => {
@@ -227,6 +241,7 @@ traced_repo = trace(repo)`;
       } else if (platform === 'win32') {
         // Windows - provide instructions
         vscode.window.showInformationMessage('Please install Python 3.10 from https://www.python.org/downloads/');
+        this.pythonInstalled = true;
         // Update panel to show next button
         setTimeout(() => {
           this.updatePanel();
@@ -286,6 +301,7 @@ traced_repo = trace(repo)`;
               return;
             }
             
+            this.leanDojoInstalled = true;
             vscode.window.showInformationMessage(`✅ LeanDojo installed successfully using ${pythonCmd}`);
             // Update panel to show next button
             setTimeout(() => {
@@ -319,6 +335,11 @@ traced_repo = trace(repo)`;
     }
 
     try {
+      // Set tracing in progress and update UI
+      this.tracingInProgress = true;
+      this.traceMessage = 'Starting trace...';
+      this.updatePanel();
+      
       vscode.window.showInformationMessage('Running trace...');
       
       return new Promise((resolve, reject) => {
@@ -337,23 +358,64 @@ traced_repo = trace(repo)`;
         
         const tryNextCommand = () => {
           if (currentIndex >= pythonCommands.length) {
+            this.tracingInProgress = false;
+            this.updatePanel();
             vscode.window.showErrorMessage('No Python installation found. Please install Python first.');
             reject(new Error('No Python found'));
             return;
           }
           
           const pythonCmd = pythonCommands[currentIndex];
-          const runCmd = `${pythonCmd} "${traceScriptPath}"`;
           
-          exec(runCmd, { cwd: tracePath }, (error, stdout, stderr) => {
-            if (error) {
-              console.log(`Failed with ${pythonCmd}: ${error.message}`);
-              currentIndex++;
-              tryNextCommand();
+          // Use spawn to capture real-time output
+          const child = spawn(pythonCmd, [traceScriptPath], { 
+            cwd: tracePath,
+            stdio: ['pipe', 'pipe', 'pipe']
+          });
+          
+          let stdout = '';
+          let stderr = '';
+          
+          child.stdout.on('data', (data) => {
+            const output = data.toString();
+            stdout += output;
+            
+            // Update UI with progress
+            this.traceMessage = output.trim();
+            this.updatePanel();
+          });
+          
+          child.stderr.on('data', (data) => {
+            const output = data.toString();
+            stderr += output;
+            
+            // Update UI with progress
+            this.traceMessage = output.trim();
+            this.updatePanel();
+          });
+          
+          child.on('error', (error) => {
+            console.log(`Failed with ${pythonCmd}: ${error.message}`);
+            currentIndex++;
+            tryNextCommand();
+          });
+          
+          child.on('close', (code) => {
+            if (code !== 0) {
+              this.tracingInProgress = false;
+              this.updatePanel();
+              vscode.window.showErrorMessage(`Failed to run trace: ${stderr}`);
+              reject(new Error(`Process exited with code ${code}`));
               return;
             }
             
+            this.repoTraced = true;
+            this.tracingInProgress = false;
+            this.traceMessage = 'Trace completed successfully!';
             vscode.window.showInformationMessage(`✅ Trace completed successfully using ${pythonCmd}`);
+            setTimeout(() => {
+              this.updatePanel();
+            }, 1000);
             resolve();
           });
         };
@@ -361,6 +423,8 @@ traced_repo = trace(repo)`;
         tryNextCommand();
       });
     } catch (error: any) {
+      this.tracingInProgress = false;
+      this.updatePanel();
       vscode.window.showErrorMessage(`Failed to run trace: ${error.message}`);
     }
   }
@@ -517,12 +581,31 @@ traced_repo = trace(repo)`;
           button:hover {
             background-color: var(--vscode-button-hoverBackground);
           }
+          button.completed {
+            background-color: var(--vscode-notificationsInfoIcon-foreground);
+            color: white;
+            cursor: default;
+          }
+          button.completed:hover {
+            background-color: var(--vscode-notificationsInfoIcon-foreground);
+          }
           .info {
             font-size: 0.8rem;
             color: var(--vscode-descriptionForeground);
             line-height: 1.4;
             margin-bottom: 1rem;
             text-align: center;
+          }
+          .trace-message {
+            font-size: 0.8rem;
+            color: var(--vscode-descriptionForeground);
+            text-align: center;
+            margin-bottom: 1rem;
+            display: ${this.tracingInProgress ? 'block' : 'none'};
+            background: var(--vscode-input-background);
+            padding: 0.5rem;
+            border-radius: 4px;
+            border: 1px solid var(--vscode-input-border);
           }
         </style>
       </head>
@@ -533,24 +616,38 @@ traced_repo = trace(repo)`;
             Follow these steps in order to set up and run your trace.
           </div>
           
-          <button onclick="installPython()">🐍 Step 1: Install Python</button>
-          <button onclick="installLeanDojo()">📦 Step 2: Install LeanDojo</button>
-          <button onclick="runTrace()">🚀 Step 3: Run Trace</button>
+          <button onclick="installPython()" class="${this.pythonInstalled ? 'completed' : ''}">
+            ${this.pythonInstalled ? '✅ Python installed' : '🐍 Step 1: Install Python'}
+          </button>
+          <button onclick="installLeanDojo()" class="${this.leanDojoInstalled ? 'completed' : ''}">
+            ${this.leanDojoInstalled ? '✅ LeanDojo installed into trace folder' : '📦 Step 2: Install LeanDojo'}
+          </button>
+          <button onclick="runTrace()" class="${this.repoTraced ? 'completed' : ''}" ${this.tracingInProgress ? 'disabled' : ''}>
+            ${this.repoTraced ? '✅ Repo traced' : '🚀 Step 3: Run Trace'}
+          </button>
+          
+          <div class="trace-message">🔄 ${this.traceMessage}</div>
         </div>
         
         <script>
           const vscode = acquireVsCodeApi();
           
           function installPython() {
-            vscode.postMessage({ command: 'installPython' });
+            if (!${this.pythonInstalled}) {
+              vscode.postMessage({ command: 'installPython' });
+            }
           }
           
           function installLeanDojo() {
-            vscode.postMessage({ command: 'installLeanDojo' });
+            if (!${this.leanDojoInstalled}) {
+              vscode.postMessage({ command: 'installLeanDojo' });
+            }
           }
           
           function runTrace() {
-            vscode.postMessage({ command: 'runTrace' });
+            if (!${this.repoTraced} && !${this.tracingInProgress}) {
+              vscode.postMessage({ command: 'runTrace' });
+            }
           }
         </script>
       </body>
@@ -559,4 +656,4 @@ traced_repo = trace(repo)`;
   }
 }
 
-export function deactivate() {} 
+export function deactivate() {}
