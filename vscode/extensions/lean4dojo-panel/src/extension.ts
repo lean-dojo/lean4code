@@ -44,10 +44,6 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
         this.handleCreatePythonFile();
       } else if (msg.command === 'traceProject') {
         this.handleTraceProject();
-      } else if (msg.command === 'createTraceFile') {
-        this.handleCreateTraceFile();
-      } else if (msg.command === 'runTrace') {
-        this.handleRunTrace();
       }
     });
   }
@@ -349,9 +345,55 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (!this._projectBuilt) {
+      vscode.window.showErrorMessage('Please build the project first before tracing');
+      return;
+    }
+
     try {
+      // Create the minimal Python file
+      const scriptPath = path.join(workspacePath, 'trace.py');
+      const scriptContent = this.generateTracePythonCode();
+      fs.writeFileSync(scriptPath, scriptContent);
+
+      // Run the Python script
+      const pythonPath = process.platform === 'win32' 
+        ? path.join(venvPath, 'Scripts', 'python')
+        : path.join(venvPath, 'bin', 'python');
+
       vscode.window.showInformationMessage('Tracing project...');
-      await this.runTraceCommand(venvPath, workspacePath);
+      const childProcess = spawn(pythonPath, [scriptPath], {
+        cwd: workspacePath,
+        stdio: 'pipe'
+      });
+
+      let output = '';
+      let errorOutput = '';
+
+      childProcess.stdout?.on('data', (data) => {
+        output += data.toString();
+        console.log('Trace output:', data.toString());
+      });
+
+      childProcess.stderr?.on('data', (data) => {
+        errorOutput += data.toString();
+        console.error('Trace error:', data.toString());
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        childProcess.on('close', (code) => {
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(new Error(`Trace failed with code ${code}. Error: ${errorOutput}`));
+          }
+        });
+
+        childProcess.on('error', (error) => {
+          reject(error);
+        });
+      });
+
       vscode.window.showInformationMessage('✅ Project traced successfully!');
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to trace project: ${error.message}`);
@@ -361,62 +403,6 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
   private runBuildCommand(workspacePath: string): Promise<void> {
     return new Promise((resolve, reject) => {
       exec('lake build', { cwd: workspacePath }, (error, stdout, stderr) => {
-        if (error) {
-          reject(new Error(stderr || error.message));
-        } else {
-          resolve();
-        }
-      });
-    });
-  }
-
-  private runTraceCommand(venvPath: string, workspacePath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      let pythonPath: string;
-      if (process.platform === 'win32') {
-        pythonPath = path.join(venvPath, 'Scripts', 'python');
-      } else {
-        pythonPath = path.join(venvPath, 'bin', 'python');
-      }
-
-      // Create the simplest possible Python script
-      const scriptPath = path.join(workspacePath, 'trace.py');
-      const scriptContent = `from lean_dojo import *
-import subprocess
-
-remote_url = "${this._repoUrl}"
-commit_hash = "${this._commitHash}"
-
-print(f"Tracing repository: {remote_url}")
-print(f"Commit hash: {commit_hash}")
-
-# Validate that the commit exists
-try:
-    result = subprocess.run(['git', 'rev-parse', '--verify', commit_hash], 
-                          capture_output=True, text=True, check=True)
-    print(f"✅ Commit {commit_hash} exists in repository")
-except subprocess.CalledProcessError:
-    print(f"❌ Error: Commit {commit_hash} not found in repository")
-    print("Available commits:")
-    subprocess.run(['git', 'log', '--oneline', '-10'])
-    raise Exception(f"Commit {commit_hash} not found")
-
-try:
-    repo = LeanGitRepo(remote_url, commit_hash)
-    traced_repo = trace(repo)
-    print("✅ Tracing completed successfully!")
-except Exception as e:
-    print(f"❌ Error during tracing: {e}")
-    raise
-`;
-
-      // Write the script file
-      fs.writeFileSync(scriptPath, scriptContent);
-      
-      vscode.window.showInformationMessage('✅ Python file created: trace.py');
-      
-      // Execute the script
-      exec(`"${pythonPath}" "${scriptPath}"`, { cwd: workspacePath }, (error, stdout, stderr) => {
         if (error) {
           reject(new Error(stderr || error.message));
         } else {
@@ -446,47 +432,14 @@ except Exception as e:
 
       // Create the simplest possible Python script
       const scriptPath = path.join(workspacePath, 'trace.py');
-      const scriptContent = `from lean_dojo import *
+      const scriptContent = this.generateTracePythonCode();
 
-remote_url = "${this._repoUrl}"
-commit_hash = "${this._commitHash}"
-
-print(f"Repo URL: {remote_url}")
-print(f"Commit Hash: {commit_hash}")
-
-repo = LeanGitRepo(remote_url, commit_hash)
-traced_repo = trace(repo)
-print("Done!")
-`;
-
-      // Write the script file
       fs.writeFileSync(scriptPath, scriptContent);
+      console.log('Python file created at:', scriptPath);
+      
+      this._pythonFileCreated = true;
       resolve();
     });
-  }
-
-  private async handleCreateTraceFile() {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-      vscode.window.showErrorMessage('No workspace folder found');
-      return;
-    }
-
-    const workspacePath = workspaceFolder.uri.fsPath;
-    const traceFilePath = path.join(workspacePath, 'trace_lean.py');
-
-    try {
-      const pythonCode = this.generateTracePythonCode();
-      fs.writeFileSync(traceFilePath, pythonCode);
-      vscode.window.showInformationMessage('✅ Trace file created successfully!');
-      
-      // Set the trace file created flag and update the webview
-      this._traceFileCreated = true;
-      this.updateWebviewTraceFileCreated();
-      
-    } catch (error: any) {
-      vscode.window.showErrorMessage(`Failed to create trace file: ${error.message}`);
-    }
   }
 
   private getHtml(): string {
@@ -859,125 +812,12 @@ print("Done!")
     `;
   }
 
-  private updateWebviewTraceFileCreated() {
-    if (this._view) {
-      this._view.webview.html = this.getHtml();
-    }
-  }
-
   private generateTracePythonCode(): string {
-    return `#!/usr/bin/env python3
-import os
-import sys
-import subprocess
-import multiprocessing
-
-def run_trace():
-    try:
-        # Add the virtual environment's site-packages to Python path
-        venv_path = os.path.join(os.getcwd(), '.leandojo_env')
-        site_packages = os.path.join(venv_path, 'lib', 'python3.11', 'site-packages')
-        if os.path.exists(site_packages):
-            sys.path.insert(0, site_packages)
-        
-        from lean_dojo import LeanDojo
-        
-        # Get the current directory (workspace)
-        workspace_path = os.getcwd()
-        
-        # Use the stored repo URL and commit hash
-        repo_url = "${this._repoUrl}"
-        commit_hash = "${this._commitHash}"
-        
-        print(f"Workspace: {workspace_path}")
-        print(f"Repo URL: {repo_url}")
-        print(f"Commit Hash: {commit_hash}")
-        
-        if not repo_url or not commit_hash:
-            print("Error: Missing repo URL or commit hash")
-            return
-        
-        # Initialize LeanDojo
-        dojo = LeanDojo(repo_url, commit_hash, workspace_path)
-        
-        # Start tracing
-        print("Starting trace...")
-        dojo.trace()
-        print("Trace completed successfully!")
-        
-    except Exception as e:
-        print(f"Error during trace: {e}")
-        import traceback
-        traceback.print_exc()
-
-if __name__ == "__main__":
-    # Set multiprocessing start method for macOS
-    if sys.platform == "darwin":
-        multiprocessing.set_start_method('spawn', force=True)
-    
-    run_trace()
-`;
-  }
-
-  private async runTraceFile(venvPath: string, traceFilePath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const pythonPath = path.join(venvPath, 'bin', 'python');
-      const process = spawn(pythonPath, [traceFilePath], {
-        cwd: path.dirname(traceFilePath),
-        stdio: 'pipe'
-      });
-
-      let output = '';
-      let errorOutput = '';
-
-      process.stdout?.on('data', (data) => {
-        output += data.toString();
-        console.log('Trace output:', data.toString());
-      });
-
-      process.stderr?.on('data', (data) => {
-        errorOutput += data.toString();
-        console.error('Trace error:', data.toString());
-      });
-
-      process.on('close', (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`Trace failed with code ${code}. Error: ${errorOutput}`));
-        }
-      });
-
-      process.on('error', (error) => {
-        reject(error);
-      });
-    });
-  }
-
-  private async handleRunTrace() {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-      vscode.window.showErrorMessage('No workspace folder found');
-      return;
-    }
-
-    const workspacePath = workspaceFolder.uri.fsPath;
-    const traceFilePath = path.join(workspacePath, 'trace_lean.py');
-    const venvPath = path.join(workspacePath, '.leandojo_env');
-
-    if (!fs.existsSync(traceFilePath)) {
-      vscode.window.showErrorMessage('Trace file not found. Please create it first.');
-      return;
-    }
-
-    try {
-      vscode.window.showInformationMessage('Running trace...');
-      await this.runTraceFile(venvPath, traceFilePath);
-      vscode.window.showInformationMessage('✅ Trace completed successfully!');
-      
-    } catch (error: any) {
-      vscode.window.showErrorMessage(`Failed to run trace: ${error.message}`);
-    }
+    return `url = "${this._repoUrl}"
+hash = "${this._commitHash}"
+from lean_dojo import *
+repo = LeanGitRepo(url, hash)
+traced_repo = trace(repo)`;
   }
 }
 
