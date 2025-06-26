@@ -17,6 +17,8 @@ export function activate(context: vscode.ExtensionContext) {
 class LeanDojoPanel implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _projectBuilt: boolean = false;
+  private _commitHash: string = '';
+  private _repoUrl: string = '';
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -27,7 +29,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
     view.webview.onDidReceiveMessage(msg => {
       if (msg.command === 'cloneRepo') {
-        this.handleCloneRepo(msg.repoUrl);
+        this.handleCloneRepo(msg.repoUrl, msg.commitHash);
       } else if (msg.command === 'installLeanDojo') {
         this.handleInstallLeanDojo();
       } else if (msg.command === 'buildProject') {
@@ -38,11 +40,20 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     });
   }
 
-  private async handleCloneRepo(repoUrl: string) {
+  private async handleCloneRepo(repoUrl: string, commitHash: string) {
     if (!repoUrl.trim()) {
       vscode.window.showErrorMessage('Please enter a repository URL');
       return;
     }
+
+    if (!commitHash.trim()) {
+      vscode.window.showErrorMessage('Please enter a commit hash');
+      return;
+    }
+
+    // Store the values
+    this._repoUrl = repoUrl.trim();
+    this._commitHash = commitHash.trim();
 
     try {
       const desktopPath = path.join(os.homedir(), 'Desktop');
@@ -324,13 +335,19 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
   private runTraceCommand(venvPath: string, workspacePath: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      let pythonPath: string;
+      if (process.platform === 'win32') {
+        pythonPath = path.join(venvPath, 'Scripts', 'python');
+      } else {
+        pythonPath = path.join(venvPath, 'bin', 'python');
+      }
+
       // Create the simplest possible Python script
       const scriptPath = path.join(workspacePath, 'trace.py');
       const scriptContent = `from lean_dojo import *
-import subprocess
 
-remote_url = subprocess.check_output(['git', 'config', '--get', 'remote.origin.url'], text=True).strip()
-commit_hash = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+remote_url = "${this._repoUrl}"
+commit_hash = "${this._commitHash}"
 
 repo = LeanGitRepo(remote_url, commit_hash)
 traced_repo = trace(repo)
@@ -341,7 +358,15 @@ print("Done!")
       fs.writeFileSync(scriptPath, scriptContent);
       
       vscode.window.showInformationMessage('✅ Python file created: trace.py');
-      resolve();
+      
+      // Execute the script
+      exec(`"${pythonPath}" "${scriptPath}"`, { cwd: workspacePath }, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(stderr || error.message));
+        } else {
+          resolve();
+        }
+      });
     });
   }
 
@@ -358,7 +383,7 @@ print("Done!")
     if (isCloned) {
       if (isInstalled) {
         if (this._projectBuilt) {
-          return this.getBuiltHtml();
+          return this.getTraceHtml();
         } else {
           return this.getInstalledHtml();
         }
@@ -420,6 +445,7 @@ print("Done!")
       <body>
         <div class="container">
           <input id="repoInput" type="text" placeholder="https://github.com/..." />
+          <input id="commitInput" type="text" placeholder="Commit hash" />
           <button onclick="cloneRepo()">Clone</button>
         </div>
         
@@ -428,13 +454,21 @@ print("Done!")
           
           function cloneRepo() {
             const repoUrl = document.getElementById('repoInput').value;
+            const commitHash = document.getElementById('commitInput').value;
             vscode.postMessage({ 
               command: 'cloneRepo', 
-              repoUrl: repoUrl
+              repoUrl: repoUrl,
+              commitHash: commitHash
             });
           }
           
           document.getElementById('repoInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+              cloneRepo();
+            }
+          });
+          
+          document.getElementById('commitInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
               cloneRepo();
             }
@@ -510,72 +544,6 @@ print("Done!")
     `;
   }
 
-  private getBuiltHtml(): string {
-    return `
-      <html>
-      <head>
-        <style>
-          body {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background: var(--vscode-sideBar-background);
-            color: var(--vscode-sideBar-foreground);
-            font-family: sans-serif;
-            padding: 1rem;
-          }
-          .container {
-            width: 100%;
-            max-width: 300px;
-            text-align: center;
-          }
-          button {
-            width: 100%;
-            padding: 0.5rem 1rem;
-            font-size: 0.9rem;
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-bottom: 1rem;
-          }
-          button:hover {
-            background-color: var(--vscode-button-hoverBackground);
-          }
-          .status {
-            font-size: 0.8rem;
-            color: var(--vscode-descriptionForeground);
-            line-height: 1.4;
-            margin-bottom: 1rem;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="status">
-            ✅ Project built successfully
-          </div>
-          <button onclick="traceProject()">Trace Project</button>
-        </div>
-        
-        <script>
-          const vscode = acquireVsCodeApi();
-          
-          function traceProject() {
-            vscode.postMessage({ 
-              command: 'traceProject'
-            });
-          }
-        </script>
-      </body>
-      </html>
-    `;
-  }
-
   private getInstalledHtml(): string {
     return `
       <html>
@@ -634,6 +602,72 @@ print("Done!")
           function buildProject() {
             vscode.postMessage({ 
               command: 'buildProject'
+            });
+          }
+        </script>
+      </body>
+      </html>
+    `;
+  }
+
+  private getTraceHtml(): string {
+    return `
+      <html>
+      <head>
+        <style>
+          body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: var(--vscode-sideBar-background);
+            color: var(--vscode-sideBar-foreground);
+            font-family: sans-serif;
+            padding: 1rem;
+          }
+          .container {
+            width: 100%;
+            max-width: 300px;
+            text-align: center;
+          }
+          button {
+            width: 100%;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 1rem;
+          }
+          button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+          }
+          .status {
+            font-size: 0.8rem;
+            color: var(--vscode-descriptionForeground);
+            line-height: 1.4;
+            margin-bottom: 1rem;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="status">
+            ✅ Project traced successfully
+          </div>
+          <button onclick="traceProject()">Trace Project</button>
+        </div>
+        
+        <script>
+          const vscode = acquireVsCodeApi();
+          
+          function traceProject() {
+            vscode.postMessage({ 
+              command: 'traceProject'
             });
           }
         </script>
