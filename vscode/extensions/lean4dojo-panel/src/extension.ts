@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 
 let panelInstance: LeanDojoPanel;
 
@@ -19,8 +19,14 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
   private _projectBuilt: boolean = false;
   private _commitHash: string = '';
   private _repoUrl: string = '';
+  private _pythonFileCreated: boolean = false;
+  private _traceFileCreated: boolean = false;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: vscode.ExtensionContext) {
+    // Load stored values from context
+    this._repoUrl = this.context.globalState.get('leanDojoRepoUrl', '');
+    this._commitHash = this.context.globalState.get('leanDojoCommitHash', '');
+  }
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this._view = view;
@@ -34,8 +40,14 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
         this.handleInstallLeanDojo();
       } else if (msg.command === 'buildProject') {
         this.handleBuildProject();
+      } else if (msg.command === 'createPythonFile') {
+        this.handleCreatePythonFile();
       } else if (msg.command === 'traceProject') {
         this.handleTraceProject();
+      } else if (msg.command === 'createTraceFile') {
+        this.handleCreateTraceFile();
+      } else if (msg.command === 'runTrace') {
+        this.handleRunTrace();
       }
     });
   }
@@ -51,9 +63,11 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       return;
     }
 
-    // Store the values
+    // Store the values in extension context for persistence
     this._repoUrl = repoUrl.trim();
     this._commitHash = commitHash.trim();
+    this.context.globalState.update('leanDojoRepoUrl', this._repoUrl);
+    this.context.globalState.update('leanDojoCommitHash', this._commitHash);
 
     try {
       const desktopPath = path.join(os.homedir(), 'Desktop');
@@ -297,6 +311,29 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     }
   }
 
+  private async handleCreatePythonFile() {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      vscode.window.showErrorMessage('No workspace folder found');
+      return;
+    }
+
+    const workspacePath = workspaceFolder.uri.fsPath;
+
+    try {
+      vscode.window.showInformationMessage('Creating Python file...');
+      await this.createPythonFile(workspacePath);
+      vscode.window.showInformationMessage('✅ Python file created: trace.py');
+      
+      // Set the flag and update the webview to show trace button
+      this._pythonFileCreated = true;
+      this.updateWebviewTrace();
+      
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to create Python file: ${error.message}`);
+    }
+  }
+
   private async handleTraceProject() {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
@@ -345,13 +382,32 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       // Create the simplest possible Python script
       const scriptPath = path.join(workspacePath, 'trace.py');
       const scriptContent = `from lean_dojo import *
+import subprocess
 
 remote_url = "${this._repoUrl}"
 commit_hash = "${this._commitHash}"
 
-repo = LeanGitRepo(remote_url, commit_hash)
-traced_repo = trace(repo)
-print("Done!")
+print(f"Tracing repository: {remote_url}")
+print(f"Commit hash: {commit_hash}")
+
+# Validate that the commit exists
+try:
+    result = subprocess.run(['git', 'rev-parse', '--verify', commit_hash], 
+                          capture_output=True, text=True, check=True)
+    print(f"✅ Commit {commit_hash} exists in repository")
+except subprocess.CalledProcessError:
+    print(f"❌ Error: Commit {commit_hash} not found in repository")
+    print("Available commits:")
+    subprocess.run(['git', 'log', '--oneline', '-10'])
+    raise Exception(f"Commit {commit_hash} not found")
+
+try:
+    repo = LeanGitRepo(remote_url, commit_hash)
+    traced_repo = trace(repo)
+    print("✅ Tracing completed successfully!")
+except Exception as e:
+    print(f"❌ Error during tracing: {e}")
+    raise
 `;
 
       // Write the script file
@@ -376,6 +432,63 @@ print("Done!")
     }
   }
 
+  private updateWebviewTrace() {
+    if (this._view) {
+      this._view.webview.html = this.getHtml();
+    }
+  }
+
+  private createPythonFile(workspacePath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Debug: show what we're using
+      console.log('Creating Python file with repo URL:', this._repoUrl);
+      console.log('Creating Python file with commit hash:', this._commitHash);
+
+      // Create the simplest possible Python script
+      const scriptPath = path.join(workspacePath, 'trace.py');
+      const scriptContent = `from lean_dojo import *
+
+remote_url = "${this._repoUrl}"
+commit_hash = "${this._commitHash}"
+
+print(f"Repo URL: {remote_url}")
+print(f"Commit Hash: {commit_hash}")
+
+repo = LeanGitRepo(remote_url, commit_hash)
+traced_repo = trace(repo)
+print("Done!")
+`;
+
+      // Write the script file
+      fs.writeFileSync(scriptPath, scriptContent);
+      resolve();
+    });
+  }
+
+  private async handleCreateTraceFile() {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      vscode.window.showErrorMessage('No workspace folder found');
+      return;
+    }
+
+    const workspacePath = workspaceFolder.uri.fsPath;
+    const traceFilePath = path.join(workspacePath, 'trace_lean.py');
+
+    try {
+      const pythonCode = this.generateTracePythonCode();
+      fs.writeFileSync(traceFilePath, pythonCode);
+      vscode.window.showInformationMessage('✅ Trace file created successfully!');
+      
+      // Set the trace file created flag and update the webview
+      this._traceFileCreated = true;
+      this.updateWebviewTraceFileCreated();
+      
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to create trace file: ${error.message}`);
+    }
+  }
+
   private getHtml(): string {
     const isCloned = this.isClonedRepository();
     const isInstalled = this.isLeanDojoInstalled();
@@ -383,7 +496,11 @@ print("Done!")
     if (isCloned) {
       if (isInstalled) {
         if (this._projectBuilt) {
-          return this.getTraceHtml();
+          if (this._pythonFileCreated) {
+            return this.getTraceHtml();
+          } else {
+            return this.getBufferHtml();
+          }
         } else {
           return this.getInstalledHtml();
         }
@@ -610,6 +727,72 @@ print("Done!")
     `;
   }
 
+  private getBufferHtml(): string {
+    return `
+      <html>
+      <head>
+        <style>
+          body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: var(--vscode-sideBar-background);
+            color: var(--vscode-sideBar-foreground);
+            font-family: sans-serif;
+            padding: 1rem;
+          }
+          .container {
+            width: 100%;
+            max-width: 300px;
+            text-align: center;
+          }
+          button {
+            width: 100%;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 1rem;
+          }
+          button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+          }
+          .status {
+            font-size: 0.8rem;
+            color: var(--vscode-descriptionForeground);
+            line-height: 1.4;
+            margin-bottom: 1rem;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="status">
+            ✅ Project built successfully
+          </div>
+          <button onclick="createPythonFile()">Create Python File</button>
+        </div>
+        
+        <script>
+          const vscode = acquireVsCodeApi();
+          
+          function createPythonFile() {
+            vscode.postMessage({ 
+              command: 'createPythonFile'
+            });
+          }
+        </script>
+      </body>
+      </html>
+    `;
+  }
+
   private getTraceHtml(): string {
     return `
       <html>
@@ -657,7 +840,7 @@ print("Done!")
       <body>
         <div class="container">
           <div class="status">
-            ✅ Project traced successfully
+            ✅ Python file created
           </div>
           <button onclick="traceProject()">Trace Project</button>
         </div>
@@ -674,6 +857,127 @@ print("Done!")
       </body>
       </html>
     `;
+  }
+
+  private updateWebviewTraceFileCreated() {
+    if (this._view) {
+      this._view.webview.html = this.getHtml();
+    }
+  }
+
+  private generateTracePythonCode(): string {
+    return `#!/usr/bin/env python3
+import os
+import sys
+import subprocess
+import multiprocessing
+
+def run_trace():
+    try:
+        # Add the virtual environment's site-packages to Python path
+        venv_path = os.path.join(os.getcwd(), '.leandojo_env')
+        site_packages = os.path.join(venv_path, 'lib', 'python3.11', 'site-packages')
+        if os.path.exists(site_packages):
+            sys.path.insert(0, site_packages)
+        
+        from lean_dojo import LeanDojo
+        
+        # Get the current directory (workspace)
+        workspace_path = os.getcwd()
+        
+        # Use the stored repo URL and commit hash
+        repo_url = "${this._repoUrl}"
+        commit_hash = "${this._commitHash}"
+        
+        print(f"Workspace: {workspace_path}")
+        print(f"Repo URL: {repo_url}")
+        print(f"Commit Hash: {commit_hash}")
+        
+        if not repo_url or not commit_hash:
+            print("Error: Missing repo URL or commit hash")
+            return
+        
+        # Initialize LeanDojo
+        dojo = LeanDojo(repo_url, commit_hash, workspace_path)
+        
+        # Start tracing
+        print("Starting trace...")
+        dojo.trace()
+        print("Trace completed successfully!")
+        
+    except Exception as e:
+        print(f"Error during trace: {e}")
+        import traceback
+        traceback.print_exc()
+
+if __name__ == "__main__":
+    # Set multiprocessing start method for macOS
+    if sys.platform == "darwin":
+        multiprocessing.set_start_method('spawn', force=True)
+    
+    run_trace()
+`;
+  }
+
+  private async runTraceFile(venvPath: string, traceFilePath: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const pythonPath = path.join(venvPath, 'bin', 'python');
+      const process = spawn(pythonPath, [traceFilePath], {
+        cwd: path.dirname(traceFilePath),
+        stdio: 'pipe'
+      });
+
+      let output = '';
+      let errorOutput = '';
+
+      process.stdout?.on('data', (data) => {
+        output += data.toString();
+        console.log('Trace output:', data.toString());
+      });
+
+      process.stderr?.on('data', (data) => {
+        errorOutput += data.toString();
+        console.error('Trace error:', data.toString());
+      });
+
+      process.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`Trace failed with code ${code}. Error: ${errorOutput}`));
+        }
+      });
+
+      process.on('error', (error) => {
+        reject(error);
+      });
+    });
+  }
+
+  private async handleRunTrace() {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      vscode.window.showErrorMessage('No workspace folder found');
+      return;
+    }
+
+    const workspacePath = workspaceFolder.uri.fsPath;
+    const traceFilePath = path.join(workspacePath, 'trace_lean.py');
+    const venvPath = path.join(workspacePath, '.leandojo_env');
+
+    if (!fs.existsSync(traceFilePath)) {
+      vscode.window.showErrorMessage('Trace file not found. Please create it first.');
+      return;
+    }
+
+    try {
+      vscode.window.showInformationMessage('Running trace...');
+      await this.runTraceFile(venvPath, traceFilePath);
+      vscode.window.showInformationMessage('✅ Trace completed successfully!');
+      
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to run trace: ${error.message}`);
+    }
   }
 }
 
