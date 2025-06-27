@@ -242,7 +242,7 @@ def main():
     out = "../out"
     if os.path.exists(out):
         shutil.rmtree(out)
-    shutil.copytree(traced_path, out)
+    shutil.copytree(traced_path.path, out)
     write_status("✅ Trace completed successfully", "success")
 
 
