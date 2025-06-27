@@ -178,7 +178,12 @@ import shutil
 import os
 import json
 from pathlib import Path
+import sys
 
+# Line-buffered logging
+log_file = open("trace_full_output.log", "w", buffering=1)
+sys.stdout = log_file
+sys.stderr = log_file
 
 def write_status(message, status="info"):
     status_file = "../out/status.json"
@@ -189,18 +194,16 @@ def write_status(message, status="info"):
             "status": status,
             "timestamp": str(Path().cwd())
         }, f, indent=2)
-    print(f"[{status.upper()}] {message}")
-
+    print(f"[{status.upper()}] {message}", flush=True)
 
 def main():
     write_status("🚀 Upgrading lean-dojo via pip...")
 
-    # Try multiple Python commands for pip upgrade
     python_commands = ["python3.11", "python3", "python"]
     pip_upgraded = False
     for python_cmd in python_commands:
         try:
-            subprocess.run([python_cmd, "-m", "pip", "install", "--upgrade", "lean-dojo"], check=False, capture_output=True)
+            subprocess.run([python_cmd, "-m", "pip", "install", "--upgrade", "lean-dojo"], check=False)
             pip_upgraded = True
             write_status(f"✅ lean-dojo upgrade attempted using {python_cmd}")
             break
@@ -237,20 +240,25 @@ def main():
 
     repo = LeanGitRepo("${repoUrl}", "${commitHash}")
     traced_path = trace(repo)
+
     write_status("Trace complete! Copying output...", "success")
-
     out = "../out"
-    if os.path.exists(out):
-        shutil.rmtree(out)
-    shutil.copytree(traced_path.path, out)
-    write_status("✅ Trace completed successfully", "success")
 
+    try:
+        shutil.copytree(traced_path.root_dir, out, dirs_exist_ok=True)
+        # ✅ Create marker flag for success
+        with open(os.path.join(out, "trace_done.flag"), "w") as f:
+            f.write("Trace completed successfully.")
+        write_status("✅ Trace completed successfully", "success")
+    except Exception as e:
+        write_status(f"🚨 Failed to copy traced output: {type(e).__name__}: {str(e)}", "error")
+        raise
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        write_status(f"🚨 Trace failed: {e}", "error")
+        write_status(f"🚨 Trace failed: {type(e).__name__}: {str(e)}", "error")
         raise
 `;
   }
