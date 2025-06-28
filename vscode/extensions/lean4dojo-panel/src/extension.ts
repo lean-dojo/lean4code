@@ -690,17 +690,6 @@ if __name__ == "__main__":
             margin-bottom: 1rem;
             text-align: center;
           }
-          .trace-message {
-            font-size: 0.8rem;
-            color: var(--vscode-descriptionForeground);
-            text-align: center;
-            margin-bottom: 1rem;
-            display: ${this.tracingInProgress ? 'block' : 'none'};
-            background: var(--vscode-input-background);
-            padding: 0.5rem;
-            border-radius: 4px;
-            border: 1px solid var(--vscode-input-border);
-          }
         </style>
       </head>
       <body>
@@ -717,10 +706,8 @@ if __name__ == "__main__":
             ${this.leanDojoInstalled ? '✅ LeanDojo installed into trace folder' : '📦 Step 2: Install LeanDojo'}
           </button>
           <button onclick="runTrace()" class="${this.repoTraced ? 'completed' : ''}" ${this.tracingInProgress ? 'disabled' : ''}>
-            ${this.repoTraced ? '✅ Repo traced' : '🚀 Step 3: Run Trace'}
+            ${this.tracingInProgress ? '🔄 ' + this.traceMessage : this.repoTraced ? '✅ Repo traced' : '🚀 Step 3: Run Trace'}
           </button>
-          
-          <div class="trace-message">🔄 ${this.traceMessage}</div>
         </div>
         
         <script>
