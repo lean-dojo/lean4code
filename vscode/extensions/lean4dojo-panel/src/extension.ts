@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import { exec, spawn } from 'child_process';
+import { exec, execSync, spawn } from 'child_process';
 
 let panelInstance: LeanDojoPanel;
 
@@ -57,13 +57,15 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
   private checkDiskSpace(directory: string): boolean {
     try {
-      const available = os.freemem(); 
-      const required = 5 * 1024 * 1024 * 1024;
-
-      return available > required;
+      const output = execSync(`df -k '${directory}' | tail -1 | awk '{print $4}'`).toString();
+      const freeKB = parseInt(output.trim(), 10);
+      const freeBytes = freeKB * 1024;
+      const requiredBytes = 5 * 1024 * 1024 * 1024; // 5 GB
+  
+      return freeBytes > requiredBytes;
     } catch (err) {
-      vscode.window.showWarningMessage('⚠️ Unable to check available memory. Proceeding anyway...');
-      return true; // Default to allowing
+      vscode.window.showWarningMessage('⚠️ Unable to check disk space. Proceeding anyway...');
+      return true;
     }
   }
 
