@@ -2,32 +2,23 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import { exec, execSync, spawn } from 'child_process';
+import { exec, spawn } from 'child_process';
 
 let panelInstance: LeanDojoPanel;
 
 export function activate(context: vscode.ExtensionContext) {
   panelInstance = new LeanDojoPanel(context);
-
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('leanDojoView', panelInstance)
-  );
-
-  // Listen for workspace changes to update the panel
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      panelInstance.updatePanel();
-    })
   );
 }
 
 class LeanDojoPanel implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
-  private pythonInstalled: boolean = false;
-  private leanDojoInstalled: boolean = false;
-  private repoTraced: boolean = false;
-  private tracingInProgress: boolean = false;
-  private traceMessage: string = '';
+  private pythonInstalled = false;
+  private leanDojoInstalled = false;
+  private tracingInProgress = false;
+  private traceMessage = '';
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -37,16 +28,12 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     this.updatePanel();
 
     view.webview.onDidReceiveMessage(msg => {
-      if (msg.command === 'createProject') {
-        this.handleCreateProject(msg.repoUrl, msg.commitHash, msg.projectName);
-      } else if (msg.command === 'installPython') {
-        this.handleInstallPython();
-      } else if (msg.command === 'installLeanDojo') {
-        this.handleInstallLeanDojo();
-      } else if (msg.command === 'runTrace') {
-        this.handleRunTrace();
-      } else if (msg.command === 'cleanupOut') {
-        this.handleCleanupOut();
+      switch (msg.command) {
+        case 'createProject': this.handleCreateProject(msg.repoUrl, msg.commitHash, msg.projectName); break;
+        case 'installPython': this.handleInstallPython(); break;
+        case 'installLeanDojo': this.handleInstallLeanDojo(); break;
+        case 'runTrace': this.handleRunTrace(); break;
+        case 'cleanupOut': this.handleCleanupOut(); break;
       }
     });
   }
@@ -57,39 +44,32 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     }
   }
 
-  private checkDiskSpace(directory: string): boolean {
+  private isLeanProject(): boolean {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    return fs.existsSync(path.join(root, 'trace', 'trace.py'));
+  }
+
+  private isValidUrl(url: string): boolean {
     try {
-      const output = execSync(`df -k '${directory}' | tail -1 | awk '{print $4}'`).toString();
-      const freeKB = parseInt(output.trim(), 10);
-      const freeBytes = freeKB * 1024;
-      const requiredBytes = 5 * 1024 * 1024 * 1024; // 5 GB
-  
-      return freeBytes > requiredBytes;
-    } catch (err) {
-      vscode.window.showWarningMessage('⚠️ Unable to check disk space. Proceeding anyway...');
-      return true;
+      new URL(url);
+      return url.includes('github.com');
+    } catch {
+      return false;
     }
   }
 
-  private isLeanProject(): boolean {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-      return false;
-    }
-
-    const rootPath = workspaceFolders[0].uri.fsPath;
-    // Check if this is a LeanDojo project (has trace folder with trace.py)
-    return fs.existsSync(path.join(rootPath, 'trace', 'trace.py'));
+  private isValidCommitHash(hash: string): boolean {
+    return /^[a-f0-9]{7,40}$/i.test(hash);
   }
 
   private async handleCreateProject(repoUrl: string, commitHash: string, projectName: string) {
-    if (!repoUrl.trim()) {
-      vscode.window.showErrorMessage('Please enter a repository URL');
+    if (!this.isValidUrl(repoUrl)) {
+      vscode.window.showErrorMessage('Please enter a valid GitHub repository URL');
       return;
     }
 
-    if (!commitHash.trim()) {
-      vscode.window.showErrorMessage('Please enter a commit hash');
+    if (!this.isValidCommitHash(commitHash)) {
+      vscode.window.showErrorMessage('Please enter a valid commit hash');
       return;
     }
 
@@ -99,96 +79,58 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     }
 
     try {
-      // Reset state for new project
+      // Reset state
       this.pythonInstalled = false;
       this.leanDojoInstalled = false;
-      this.repoTraced = false;
       this.tracingInProgress = false;
       this.traceMessage = '';
 
-      // Create project folder on Desktop
+      // Create project on Desktop
       const desktopPath = path.join(os.homedir(), 'Desktop');
       const projectPath = path.join(desktopPath, projectName.trim());
       
-      // Create project structure with three subfolders
-      await this.createProjectStructure(projectPath, repoUrl.trim(), commitHash.trim());
-      
-      // Open the project folder in VS Code
-      const uri = vscode.Uri.file(projectPath);
-      await vscode.commands.executeCommand('vscode.openFolder', uri);
-      
-      vscode.window.showInformationMessage(`✅ Project created: ${projectName}`);
-      
-      // Update the panel to show the new buttons
-      this.updatePanel();
-      
+      // Create folders
+      const tracePath = path.join(projectPath, 'trace');
+      const repoPath = path.join(projectPath, 'repo');
+      const outPath = path.join(projectPath, 'out');
+
+      fs.mkdirSync(projectPath, { recursive: true });
+      fs.mkdirSync(tracePath, { recursive: true });
+      fs.mkdirSync(repoPath, { recursive: true });
+      fs.mkdirSync(outPath, { recursive: true });
+
+      // Create trace script
+      const traceScript = this.generateTraceScript(repoUrl, commitHash);
+      fs.writeFileSync(path.join(tracePath, 'trace.py'), traceScript);
+
+      // Clone repo
+      exec(`git clone "${repoUrl}" .`, { cwd: repoPath }, (error) => {
+        if (error) {
+          vscode.window.showErrorMessage(`Failed to clone repository: ${error.message}`);
+          return;
+        }
+
+        exec(`git checkout ${commitHash}`, { cwd: repoPath }, (checkoutError) => {
+          if (checkoutError) {
+            vscode.window.showErrorMessage(`Failed to checkout commit: ${checkoutError.message}`);
+            return;
+          }
+
+          // Open project in VS Code
+          const uri = vscode.Uri.file(projectPath);
+          vscode.commands.executeCommand('vscode.openFolder', uri);
+          
+          vscode.window.showInformationMessage(`✅ Project created: ${projectName}`);
+          this.updatePanel();
+        });
+      });
+
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to create project: ${error.message}`);
     }
   }
 
-  private async createProjectStructure(projectPath: string, repoUrl: string, commitHash: string): Promise<void> {
-    // Create main project folder
-    if (!fs.existsSync(projectPath)) {
-      fs.mkdirSync(projectPath, { recursive: true });
-    }
-
-    // Create three subfolders
-    const tracePath = path.join(projectPath, 'trace');
-    const repoPath = path.join(projectPath, 'repo');
-    const outPath = path.join(projectPath, 'out');
-
-    fs.mkdirSync(tracePath, { recursive: true });
-    fs.mkdirSync(repoPath, { recursive: true });
-    fs.mkdirSync(outPath, { recursive: true });
-
-    // Create trace.py file in trace folder with the variables and commands
-    await this.createTraceFile(tracePath, repoUrl, commitHash);
-
-    // Clone repository into repo folder
-    await this.cloneRepository(repoUrl, commitHash, repoPath);
-  }
-
-  private async cloneRepository(repoUrl: string, commitHash: string, repoPath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Check if repo already exists
-      if (fs.existsSync(path.join(repoPath, '.git'))) {
-        console.log('Repository already exists, skipping clone');
-        resolve();
-        return;
-      }
-
-      vscode.window.showInformationMessage('Cloning repository...');
-      
-      exec(`git clone "${repoUrl}" .`, { cwd: repoPath }, (error, stdout, stderr) => {
-        if (error) {
-          reject(new Error(`Failed to clone repository: ${stderr || error.message}`));
-          return;
-        }
-
-        // Checkout specific commit
-        exec(`git checkout ${commitHash}`, { cwd: repoPath }, (checkoutError, checkoutStdout, checkoutStderr) => {
-          if (checkoutError) {
-            reject(new Error(`Failed to checkout commit: ${checkoutStderr || checkoutError.message}`));
-            return;
-          }
-
-          vscode.window.showInformationMessage('✅ Repository cloned and commit checked out');
-          resolve();
-        });
-      });
-    });
-  }
-
-  private async createTraceFile(tracePath: string, repoUrl: string, commitHash: string): Promise<void> {
-    const traceScriptPath = path.join(tracePath, 'trace.py');
-    const pythonCode = this.generateTraceCode(repoUrl, commitHash);
-    
-    fs.writeFileSync(traceScriptPath, pythonCode);
-    console.log('Created trace.py at:', traceScriptPath);
-  }
-
-  private generateTraceCode(repoUrl: string, commitHash: string): string {
+  private generateTraceScript(repoUrl: string, commitHash: string): string {
     return `import subprocess
 import shutil
 import os
@@ -214,19 +156,8 @@ def write_status(message, status="info"):
 
 def main():
     write_status("🚀 Upgrading lean-dojo via pip...")
-
-    python_commands = ["python3.11", "python3", "python"]
-    pip_upgraded = False
-    for python_cmd in python_commands:
-        try:
-            subprocess.run([python_cmd, "-m", "pip", "install", "--upgrade", "lean-dojo"], check=False)
-            pip_upgraded = True
-            write_status(f"✅ lean-dojo upgrade attempted using {python_cmd}")
-            break
-        except FileNotFoundError:
-            continue
-    if not pip_upgraded:
-        write_status("⚠️  Could not upgrade lean-dojo, continuing anyway...")
+    write_status(f"✅ Using Python: {sys.executable}")
+    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "lean-dojo"], check=True)
 
     repo_path = "../repo"
     write_status(f"Using repo folder: {repo_path}")
@@ -274,83 +205,50 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        write_status(f"🚨 Trace failed: {type(e).__name__}: {str(e)}", "error")
+        write_status(f"🚨 Trace failed during lake build. This may be due to an unsupported Lean version or outdated repo structure: {type(e).__name__}: {str(e)}", "error")
         raise
 `;
   }
 
   private async handleInstallPython(): Promise<void> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-      vscode.window.showErrorMessage('No workspace folder open');
-      return;
-    }
-
-    const rootPath = workspaceFolders[0].uri.fsPath;
-    const tracePath = path.join(rootPath, 'trace');
-
+    const platform = os.platform();
+    
     try {
       vscode.window.showInformationMessage('Installing Python...');
       
-      const platform = os.platform();
-      
       if (platform === 'darwin') {
-        // macOS - use Homebrew to install Python
-        return new Promise((resolve, reject) => {
-          exec('brew install python@3.10', (error, stdout, stderr) => {
-            if (error) {
-              vscode.window.showErrorMessage(`Failed to install Python: ${stderr || error.message}`);
-              reject(error);
-              return;
-            }
-            
-            this.pythonInstalled = true;
-            vscode.window.showInformationMessage('✅ Python installed successfully');
-            // Update panel to show next button
-            setTimeout(() => {
-              this.updatePanel();
-            }, 1000);
-            resolve();
-          });
+        exec('brew install python@3.10', (error) => {
+          if (error) {
+            vscode.window.showErrorMessage(`Failed to install Python: ${error.message}`);
+            return;
+          }
+          this.pythonInstalled = true;
+          vscode.window.showInformationMessage('✅ Python installed successfully');
+          setTimeout(() => this.updatePanel(), 1000);
         });
       } else if (platform === 'linux') {
-        // Linux - use apt or yum
-        return new Promise((resolve, reject) => {
-          exec('which apt-get', (aptError) => {
-            const packageManager = aptError ? 'yum' : 'apt-get';
-            const installCmd = packageManager === 'apt-get' 
-              ? 'sudo apt-get update && sudo apt-get install -y python3.10 python3.10-pip'
-              : 'sudo yum install -y python3.10 python3.10-pip';
-            
-            exec(installCmd, (error, stdout, stderr) => {
-              if (error) {
-                vscode.window.showErrorMessage(`Failed to install Python: ${stderr || error.message}`);
-                reject(error);
-                return;
-              }
-              
-              this.pythonInstalled = true;
-              vscode.window.showInformationMessage('✅ Python installed successfully');
-              // Update panel to show next button
-              setTimeout(() => {
-                this.updatePanel();
-              }, 1000);
-              resolve();
-            });
+        exec('which apt-get', (aptError) => {
+          const packageManager = aptError ? 'yum' : 'apt-get';
+          const installCmd = packageManager === 'apt-get' 
+            ? 'sudo apt-get update && sudo apt-get install -y python3.10 python3.10-pip'
+            : 'sudo yum install -y python3.10 python3.10-pip';
+          
+          exec(installCmd, (error) => {
+            if (error) {
+              vscode.window.showErrorMessage(`Failed to install Python: ${error.message}`);
+              return;
+            }
+            this.pythonInstalled = true;
+            vscode.window.showInformationMessage('✅ Python installed successfully');
+            setTimeout(() => this.updatePanel(), 1000);
           });
         });
       } else if (platform === 'win32') {
-        // Windows - provide instructions
         vscode.window.showInformationMessage('Please install Python 3.10 from https://www.python.org/downloads/');
         this.pythonInstalled = true;
-        // Update panel to show next button
-        setTimeout(() => {
-          this.updatePanel();
-        }, 1000);
-        return;
+        setTimeout(() => this.updatePanel(), 1000);
       } else {
         vscode.window.showErrorMessage(`Unsupported platform: ${platform}`);
-        return;
       }
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to install Python: ${error.message}`);
@@ -358,227 +256,145 @@ if __name__ == "__main__":
   }
 
   private async handleInstallLeanDojo(): Promise<void> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
       vscode.window.showErrorMessage('No workspace folder open');
       return;
     }
 
-    const rootPath = workspaceFolders[0].uri.fsPath;
-    const tracePath = path.join(rootPath, 'trace');
-
-    try {
-      vscode.window.showInformationMessage('Installing LeanDojo...');
+    const tracePath = path.join(root, 'trace');
+    const pythonCommands = ['python3.10', 'python3', 'python'];
+    
+    let currentIndex = 0;
+    
+    const tryNextCommand = () => {
+      if (currentIndex >= pythonCommands.length) {
+        vscode.window.showErrorMessage('No Python installation found. Please install Python first.');
+        return;
+      }
       
-      return new Promise((resolve, reject) => {
-        // Try multiple Python commands in order of preference
-        const pythonCommands = [
-          'python3.10',
-          'python3', 
-          'python',
-          '/usr/local/bin/python3.10',
-          '/usr/local/bin/python3',
-          '/opt/homebrew/bin/python3.10',
-          '/opt/homebrew/bin/python3'
-        ];
+      const pythonCmd = pythonCommands[currentIndex];
+      exec(`${pythonCmd} -m pip install lean-dojo`, { cwd: tracePath }, (error) => {
+        if (error) {
+          currentIndex++;
+          tryNextCommand();
+          return;
+        }
         
-        let currentIndex = 0;
-        
-        const tryNextCommand = () => {
-          if (currentIndex >= pythonCommands.length) {
-            vscode.window.showErrorMessage('No Python installation found. Please install Python first.');
-            reject(new Error('No Python found'));
-            return;
-          }
-          
-          const pythonCmd = pythonCommands[currentIndex];
-          const pipCmd = `${pythonCmd} -m pip install lean-dojo`;
-          
-          exec(pipCmd, { cwd: tracePath }, (error, stdout, stderr) => {
-            if (error) {
-              console.log(`Failed with ${pythonCmd}: ${error.message}`);
-              currentIndex++;
-              tryNextCommand();
-              return;
-            }
-            
-            this.leanDojoInstalled = true;
-            vscode.window.showInformationMessage(`✅ LeanDojo installed successfully using ${pythonCmd}`);
-            // Update panel to show next button
-            setTimeout(() => {
-              this.updatePanel();
-            }, 1000);
-            resolve();
-          });
-        };
-        
-        tryNextCommand();
+        this.leanDojoInstalled = true;
+        vscode.window.showInformationMessage(`✅ LeanDojo installed successfully using ${pythonCmd}`);
+        setTimeout(() => this.updatePanel(), 1000);
       });
-    } catch (error: any) {
-      vscode.window.showErrorMessage(`Failed to install LeanDojo: ${error.message}`);
-    }
+    };
+    
+    vscode.window.showInformationMessage('Installing LeanDojo...');
+    tryNextCommand();
   }
 
   private async handleRunTrace(): Promise<void> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
       vscode.window.showErrorMessage('No workspace folder open');
       return;
     }
 
-    const rootPath = workspaceFolders[0].uri.fsPath;
-    const tracePath = path.join(rootPath, 'trace');
+    const tracePath = path.join(root, 'trace');
     const traceScriptPath = path.join(tracePath, 'trace.py');
 
     if (!fs.existsSync(traceScriptPath)) {
-      vscode.window.showErrorMessage('trace.py not found in trace folder');
+      vscode.window.showErrorMessage('trace.py not found');
       return;
     }
 
-    if (!this.checkDiskSpace(tracePath)) {
-      vscode.window.showErrorMessage('🚨 Not enough disk space to run trace. Please free up at least 5GB.');
-      return;
-    }
+    this.tracingInProgress = true;
+    this.traceMessage = 'Starting trace...';
+    this.updatePanel();
 
-    try {
-      this.tracingInProgress = true;
-      this.traceMessage = 'Starting trace...';
-      this.updatePanel();
+    vscode.window.showInformationMessage('Running trace...');
 
-      vscode.window.showInformationMessage('Running trace...');
+    const pythonCommands = ['python3.10', 'python3', 'python'];
+    let currentIndex = 0;
 
-      return new Promise((resolve, reject) => {
-        const pythonCommands = [
-          'python3.10', 'python3', 'python',
-          '/usr/local/bin/python3.10',
-          '/usr/local/bin/python3',
-          '/opt/homebrew/bin/python3.10',
-          '/opt/homebrew/bin/python3'
-        ];
+    const tryNextCommand = () => {
+      if (currentIndex >= pythonCommands.length) {
+        this.tracingInProgress = false;
+        this.updatePanel();
+        vscode.window.showErrorMessage('No Python installation found. Please install Python first.');
+        return;
+      }
 
-        let currentIndex = 0;
+      const pythonCmd = pythonCommands[currentIndex];
+      const child = spawn(pythonCmd, [traceScriptPath], { cwd: tracePath });
 
-        const tryNextCommand = () => {
-          if (currentIndex >= pythonCommands.length) {
-            this.tracingInProgress = false;
-            this.updatePanel();
-            vscode.window.showErrorMessage('No Python installation found. Please install Python first.');
-            reject(new Error('No Python found'));
-            return;
-          }
+      child.stdout.on('data', (data) => {
+        this.traceMessage = data.toString().trim();
+        this.updatePanel();
+      });
 
-          const pythonCmd = pythonCommands[currentIndex];
+      child.stderr.on('data', (data) => {
+        this.traceMessage = data.toString().trim();
+        this.updatePanel();
+      });
 
-          const child = spawn(pythonCmd, [traceScriptPath], {
-            cwd: tracePath,
-            stdio: ['pipe', 'pipe', 'pipe']
-          });
-
-          let stdout = '';
-          let stderr = '';
-
-          child.stdout.on('data', (data) => {
-            const output = data.toString();
-            stdout += output;
-            this.traceMessage = output.trim();
-            this.updatePanel();
-          });
-
-          child.stderr.on('data', (data) => {
-            const output = data.toString();
-            stderr += output;
-            this.traceMessage = output.trim();
-            this.updatePanel();
-          });
-
-          child.on('error', (error) => {
-            console.log(`Failed with ${pythonCmd}: ${error.message}`);
-            currentIndex++;
-            tryNextCommand();
-          });
-
-          child.on('close', (code) => {
-            this.tracingInProgress = false;
-            if (code !== 0) {
-              this.updatePanel();
-              vscode.window.showErrorMessage(`Failed to run trace: ${stderr}`);
-              reject(new Error(`Process exited with code ${code}`));
-              return;
-            }
-
-            this.repoTraced = true;
-            this.traceMessage = 'Trace completed successfully!';
-            vscode.window.showInformationMessage(`✅ Trace completed successfully using ${pythonCmd}`);
-            setTimeout(() => {
-              this.updatePanel();
-            }, 1000);
-            resolve();
-          });
-        };
-
+      child.on('error', () => {
+        currentIndex++;
         tryNextCommand();
       });
-    } catch (error: any) {
-      this.tracingInProgress = false;
-      this.updatePanel();
-      vscode.window.showErrorMessage(`Failed to run trace: ${error.message}`);
-    }
+
+      child.on('close', (code) => {
+        this.tracingInProgress = false;
+        if (code !== 0) {
+          vscode.window.showErrorMessage(`Trace failed with exit code ${code}`);
+          this.traceMessage = '❌ Trace failed';
+        } else {
+          vscode.window.showInformationMessage('✅ Trace completed successfully');
+          this.traceMessage = '✅ Trace completed successfully!';
+        }
+        this.updatePanel();
+      });
+    };
+
+    tryNextCommand();
   }
 
   private async handleCleanupOut(): Promise<void> {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-      vscode.window.showErrorMessage('No workspace folder open');
-      return;
-    }
-  
-    const rootPath = workspaceFolders[0].uri.fsPath;
-    const outPath  = path.join(rootPath, 'out');
-  
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) return;
+
+    const outPath = path.join(root, 'out');
     if (!fs.existsSync(outPath)) {
-      vscode.window.showErrorMessage('out folder does not exist');
+      vscode.window.showInformationMessage('out folder does not exist');
       return;
     }
-  
+
     try {
-      vscode.window.showInformationMessage('Cleaning up tracing artifacts…');
-  
-      // 🔑 1. Exact names inside the *out* directory
       const itemsToDelete = [
-        '.lake',                 // Lake build cache & olean files
-        'lean-toolchain',        // pinned toolchain spec
-        'lake-manifest.json'     // manifest generated by Lake
-        // <add more filenames here if you later notice others>
+        path.join(outPath, 'lake'),
+        path.join(outPath, 'elan'),
+        path.join(outPath, 'lake-manifest.json'),
+        path.join(outPath, 'lean-toolchain')
       ];
-  
-      // 🔑 2. Remove them if they exist
-      for (const rel of itemsToDelete) {
-        const target = path.join(outPath, rel);
-        if (!fs.existsSync(target)) continue;
-  
-        const stats = fs.statSync(target);
-        if (stats.isDirectory()) {
-          fs.rmSync(target, { recursive: true, force: true });
-        } else {
-          fs.unlinkSync(target);
+
+      for (const item of itemsToDelete) {
+        if (fs.existsSync(item)) {
+          if (fs.statSync(item).isDirectory()) {
+            fs.rmSync(item, { recursive: true, force: true });
+          } else {
+            fs.unlinkSync(item);
+          }
         }
       }
-  
+      
       vscode.window.showInformationMessage('✅ Cleanup completed.');
-      this.updatePanel();   // refresh UI
-    } catch (err: any) {
-      vscode.window.showErrorMessage(`❌ Cleanup failed: ${err.message}`);
+      this.updatePanel();
+      
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`❌ Cleanup failed: ${error.message}`);
     }
   }
 
   private getHtml(): string {
-    const isLeanProject = this.isLeanProject();
-    
-    if (isLeanProject) {
-      return this.getLeanProjectHtml();
-    } else {
-      return this.getCreateProjectHtml();
-    }
+    return this.isLeanProject() ? this.getLeanProjectHtml() : this.getCreateProjectHtml();
   }
 
   private getCreateProjectHtml(): string {
@@ -664,7 +480,6 @@ if __name__ == "__main__":
             });
           }
           
-          // Allow Enter key to submit
           document.getElementById('projectInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
               document.getElementById('repoInput').focus();
@@ -689,9 +504,8 @@ if __name__ == "__main__":
   }
 
   private getLeanProjectHtml(): string {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    const rootPath = workspaceFolders?.[0]?.uri.fsPath ?? '';
-    const traceDoneFlagPath = path.join(rootPath, 'out', 'trace_done.flag');
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    const traceDoneFlagPath = path.join(root, 'out', 'trace_done.flag');
     const showCleanupButton = fs.existsSync(traceDoneFlagPath);
 
     return `
@@ -773,10 +587,10 @@ if __name__ == "__main__":
             ${this.pythonInstalled ? '✅ Python installed' : '🐍 Step 1: Install Python'}
           </button>
           <button onclick="installLeanDojo()" class="${this.leanDojoInstalled ? 'completed' : ''}">
-            ${this.leanDojoInstalled ? '✅ LeanDojo installed into trace folder' : '📦 Step 2: Install LeanDojo'}
+            ${this.leanDojoInstalled ? '✅ LeanDojo installed' : '📦 Step 2: Install LeanDojo'}
           </button>
-          <button onclick="runTrace()" class="${this.repoTraced ? 'completed' : ''}" ${this.tracingInProgress ? 'disabled' : ''}>
-            ${this.tracingInProgress ? '🔄 ' + this.traceMessage : this.repoTraced ? '✅ Repo traced' : '🚀 Step 3: Run Trace'}
+          <button onclick="runTrace()" ${this.tracingInProgress ? 'disabled' : ''}>
+            ${this.tracingInProgress ? '🔄 ' + this.traceMessage : '🚀 Step 3: Run Trace'}
           </button>
           
           ${showCleanupButton ? `
@@ -787,7 +601,7 @@ if __name__ == "__main__":
           ` : ''}
           
           <div class="trace-info">
-            Tracing is completed when the project's "out" folder is populated; this may take hours
+            Tracing is completed when your project's "out" folder is populated; this may take hours
           </div>
         </div>
         
@@ -807,7 +621,7 @@ if __name__ == "__main__":
           }
           
           function runTrace() {
-            if (!${this.repoTraced} && !${this.tracingInProgress}) {
+            if (!${this.tracingInProgress}) {
               vscode.postMessage({ command: 'runTrace' });
             }
           }
