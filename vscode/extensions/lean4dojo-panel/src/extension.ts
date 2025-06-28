@@ -55,6 +55,18 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     }
   }
 
+  private checkDiskSpace(directory: string): boolean {
+    try {
+      const available = os.freemem(); 
+      const required = 5 * 1024 * 1024 * 1024;
+
+      return available > required;
+    } catch (err) {
+      vscode.window.showWarningMessage('⚠️ Unable to check available memory. Proceeding anyway...');
+      return true; // Default to allowing
+    }
+  }
+
   private isLeanProject(): boolean {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -419,28 +431,29 @@ if __name__ == "__main__":
       return;
     }
 
+    if (!this.checkDiskSpace(tracePath)) {
+      vscode.window.showErrorMessage('🚨 Not enough disk space to run trace. Please free up at least 5GB.');
+      return;
+    }
+
     try {
-      // Set tracing in progress and update UI
       this.tracingInProgress = true;
       this.traceMessage = 'Starting trace...';
       this.updatePanel();
-      
+
       vscode.window.showInformationMessage('Running trace...');
-      
+
       return new Promise((resolve, reject) => {
-        // Try multiple Python commands in order of preference
         const pythonCommands = [
-          'python3.10',
-          'python3', 
-          'python',
+          'python3.10', 'python3', 'python',
           '/usr/local/bin/python3.10',
           '/usr/local/bin/python3',
           '/opt/homebrew/bin/python3.10',
           '/opt/homebrew/bin/python3'
         ];
-        
+
         let currentIndex = 0;
-        
+
         const tryNextCommand = () => {
           if (currentIndex >= pythonCommands.length) {
             this.tracingInProgress = false;
@@ -449,53 +462,47 @@ if __name__ == "__main__":
             reject(new Error('No Python found'));
             return;
           }
-          
+
           const pythonCmd = pythonCommands[currentIndex];
-          
-          // Use spawn to capture real-time output
-          const child = spawn(pythonCmd, [traceScriptPath], { 
+
+          const child = spawn(pythonCmd, [traceScriptPath], {
             cwd: tracePath,
             stdio: ['pipe', 'pipe', 'pipe']
           });
-          
+
           let stdout = '';
           let stderr = '';
-          
+
           child.stdout.on('data', (data) => {
             const output = data.toString();
             stdout += output;
-            
-            // Update UI with progress
             this.traceMessage = output.trim();
             this.updatePanel();
           });
-          
+
           child.stderr.on('data', (data) => {
             const output = data.toString();
             stderr += output;
-            
-            // Update UI with progress
             this.traceMessage = output.trim();
             this.updatePanel();
           });
-          
+
           child.on('error', (error) => {
             console.log(`Failed with ${pythonCmd}: ${error.message}`);
             currentIndex++;
             tryNextCommand();
           });
-          
+
           child.on('close', (code) => {
+            this.tracingInProgress = false;
             if (code !== 0) {
-              this.tracingInProgress = false;
               this.updatePanel();
               vscode.window.showErrorMessage(`Failed to run trace: ${stderr}`);
               reject(new Error(`Process exited with code ${code}`));
               return;
             }
-            
+
             this.repoTraced = true;
-            this.tracingInProgress = false;
             this.traceMessage = 'Trace completed successfully!';
             vscode.window.showInformationMessage(`✅ Trace completed successfully using ${pythonCmd}`);
             setTimeout(() => {
@@ -504,7 +511,7 @@ if __name__ == "__main__":
             resolve();
           });
         };
-        
+
         tryNextCommand();
       });
     } catch (error: any) {
