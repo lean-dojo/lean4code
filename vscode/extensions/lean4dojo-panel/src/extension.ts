@@ -690,6 +690,17 @@ if __name__ == "__main__":
             margin-bottom: 1rem;
             text-align: center;
           }
+          .trace-info {
+            font-size: 0.75rem;
+            color: var(--vscode-descriptionForeground);
+            text-align: center;
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background: var(--vscode-input-background);
+            border-radius: 4px;
+            border: 1px solid var(--vscode-input-border);
+            display: ${this.tracingInProgress ? 'block' : 'none'};
+          }
         </style>
       </head>
       <body>
@@ -708,6 +719,10 @@ if __name__ == "__main__":
           <button onclick="runTrace()" class="${this.repoTraced ? 'completed' : ''}" ${this.tracingInProgress ? 'disabled' : ''}>
             ${this.tracingInProgress ? '🔄 ' + this.traceMessage : this.repoTraced ? '✅ Repo traced' : '🚀 Step 3: Run Trace'}
           </button>
+          
+          <div class="trace-info">
+            Tracing is completed when the project's "out" folder is populated; this may take hours
+          </div>
         </div>
         
         <script>
