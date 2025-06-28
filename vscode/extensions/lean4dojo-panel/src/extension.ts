@@ -29,7 +29,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
     view.webview.onDidReceiveMessage(msg => {
       switch (msg.command) {
-        case 'createProject': this.handleCreateProject(msg.repoUrl, msg.commitHash, msg.projectName); break;
+        case 'createProject': this.handleCreateProject(msg.repoUrl, msg.commitHash, msg.projectName, msg.token, msg.leanVersion); break;
         case 'installPython': this.handleInstallPython(); break;
         case 'installLeanDojo': this.handleInstallLeanDojo(); break;
         case 'runTrace': this.handleRunTrace(); break;
@@ -62,7 +62,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     return /^[a-f0-9]{7,40}$/i.test(hash);
   }
 
-  private async handleCreateProject(repoUrl: string, commitHash: string, projectName: string) {
+  private async handleCreateProject(repoUrl: string, commitHash: string, projectName: string, token: string, leanVersion: string) {
     if (!this.isValidUrl(repoUrl)) {
       vscode.window.showErrorMessage('Please enter a valid GitHub repository URL');
       return;
@@ -75,6 +75,16 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
     if (!projectName.trim()) {
       vscode.window.showErrorMessage('Please enter a project name');
+      return;
+    }
+
+    if (!token.trim()) {
+      vscode.window.showErrorMessage('Please enter a Personal Access Token');
+      return;
+    }
+
+    if (!leanVersion.trim()) {
+      vscode.window.showErrorMessage('Please enter a Lean version');
       return;
     }
 
@@ -100,7 +110,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       fs.mkdirSync(outPath, { recursive: true });
 
       // Create trace script
-      const traceScript = this.generateTraceScript(repoUrl, commitHash);
+      const traceScript = this.generateTraceScript(repoUrl, commitHash, token.trim(), leanVersion.trim());
       fs.writeFileSync(path.join(tracePath, 'trace.py'), traceScript);
 
       // Clone repo
@@ -130,13 +140,16 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     }
   }
 
-  private generateTraceScript(repoUrl: string, commitHash: string): string {
+  private generateTraceScript(repoUrl: string, commitHash: string, token: string, leanVersion: string): string {
     return `import subprocess
 import shutil
 import os
 import json
 from pathlib import Path
 import sys
+
+# Set GitHub token for unlimited API access
+os.environ['GITHUB_TOKEN'] = '${token}'
 
 # Line-buffered logging
 log_file = open("trace_full_output.log", "w", buffering=1)
@@ -157,24 +170,21 @@ def write_status(message, status="info"):
 def main():
     write_status("🚀 Upgrading lean-dojo via pip...")
     write_status(f"✅ Using Python: {sys.executable}")
+    write_status(f"✅ Using Lean version: ${leanVersion}")
     subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "lean-dojo"], check=True)
 
     repo_path = "../repo"
     write_status(f"Using repo folder: {repo_path}")
 
-    toolchain_file = os.path.join(repo_path, "lean-toolchain")
-    if os.path.isfile(toolchain_file):
-        lean_version = open(toolchain_file).read().strip()
-        write_status(f"Detected Lean version from lean-toolchain: {lean_version}")
-    else:
-        lean_version = "leanprover/lean4:nightly"
-        write_status(f"⚠️ No lean-toolchain found. Using fallback Lean version: {lean_version}")
+    # Use the provided Lean version instead of detecting from lean-toolchain
+    lean_version = "${leanVersion}"
+    write_status(f"Using specified Lean version: {lean_version}")
 
     if not shutil.which("elan"):
         write_status("Installing elan via curl...")
         subprocess.run("curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh", shell=True, check=True)
 
-    write_status("Ensuring Lean toolchain installed...")
+    write_status("Installing specified Lean toolchain...")
     subprocess.run(["elan", "install", lean_version], cwd=repo_path, check=False)
     subprocess.run(["elan", "override", "set", lean_version], cwd=repo_path, check=True)
 
@@ -449,6 +459,12 @@ if __name__ == "__main__":
             line-height: 1.4;
             margin-bottom: 1rem;
           }
+          .field-label {
+            font-size: 0.75rem;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 0.25rem;
+            font-weight: 500;
+          }
         </style>
       </head>
       <body>
@@ -458,9 +474,21 @@ if __name__ == "__main__":
             Creates a project folder with trace, repo, and out directories.
           </div>
           
-          <input id="projectInput" type="text" placeholder="Project name (e.g., my_lean_project)" />
+          <div class="field-label">Project Name</div>
+          <input id="projectInput" type="text" placeholder="e.g., my_lean_project" />
+          
+          <div class="field-label">GitHub Repository URL</div>
           <input id="repoInput" type="text" placeholder="https://github.com/username/repo" />
-          <input id="commitInput" type="text" placeholder="Commit hash (e.g., abc1234...)" />
+          
+          <div class="field-label">Commit Hash</div>
+          <input id="commitInput" type="text" placeholder="e.g., abc1234..." />
+          
+          <div class="field-label">Personal Access Token</div>
+          <input id="tokenInput" type="text" placeholder="GitHub PAT for unlimited API access" />
+          
+          <div class="field-label">Lean Version</div>
+          <input id="leanVersionInput" type="text" placeholder="e.g., leanprover/lean4:v4.21.0-rc3" />
+          
           <button onclick="createProject()">🚀 Create Project</button>
         </div>
         
@@ -471,12 +499,16 @@ if __name__ == "__main__":
             const projectName = document.getElementById('projectInput').value;
             const repoUrl = document.getElementById('repoInput').value;
             const commitHash = document.getElementById('commitInput').value;
+            const token = document.getElementById('tokenInput').value;
+            const leanVersion = document.getElementById('leanVersionInput').value;
             
             vscode.postMessage({ 
               command: 'createProject', 
               projectName: projectName,
               repoUrl: repoUrl,
-              commitHash: commitHash
+              commitHash: commitHash,
+              token: token,
+              leanVersion: leanVersion
             });
           }
           
@@ -493,6 +525,18 @@ if __name__ == "__main__":
           });
           
           document.getElementById('commitInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+              document.getElementById('tokenInput').focus();
+            }
+          });
+          
+          document.getElementById('tokenInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+              document.getElementById('leanVersionInput').focus();
+            }
+          });
+          
+          document.getElementById('leanVersionInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
               createProject();
             }
