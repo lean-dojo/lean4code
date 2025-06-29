@@ -82,21 +82,29 @@ export class GettingStartedPage extends EditorPane {
         strongEl.textContent = text;
         el.appendChild(strongEl);
       } else {
-        el.textContent = text;
+        // Check if text contains URLs and make them clickable
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        if (urlRegex.test(text)) {
+          const parts = text.split(urlRegex);
+          parts.forEach((part, index) => {
+            if (urlRegex.test(part)) {
+              const link = document.createElement('a');
+              link.href = part;
+              link.textContent = part;
+              link.style.color = 'lightblue';
+              link.style.textDecoration = 'underline';
+              link.style.cursor = 'pointer';
+              link.target = '_blank';
+              el.appendChild(link);
+            } else if (part) {
+              el.appendChild(document.createTextNode(part));
+            }
+          });
+        } else {
+          el.textContent = text;
+        }
       }
       wrapper.appendChild(el);
-    };
-  
-    const addList = (items: string[]) => {
-      const ul = document.createElement('ul');
-      ul.style.listStyle = 'none';
-      ul.style.padding = '0';
-      items.forEach(text => {
-        const li = document.createElement('li');
-        li.textContent = text;
-        ul.appendChild(li);
-      });
-      wrapper.appendChild(ul);
     };
   
     const addLink = (text: string, href: string) => {
@@ -105,6 +113,9 @@ export class GettingStartedPage extends EditorPane {
       link.textContent = text;
       link.href = href;
       link.style.color = 'lightblue';
+      link.style.textDecoration = 'underline';
+      link.style.cursor = 'pointer';
+      link.target = '_blank';
       p.textContent = 'Get started with Lean 4 👉 ';
       p.appendChild(link);
       wrapper.appendChild(p);
@@ -113,30 +124,43 @@ export class GettingStartedPage extends EditorPane {
     wrapper.appendChild(document.createElement('h1')).textContent = 'Welcome to Lean4Code';
     addParagraph('Welcome to Lean4Code, the customized code editor designed specifically for Lean 4!', 'p', true);
   
-    wrapper.appendChild(document.createElement('h2')).textContent = '🚀 Get Started Instantly';
-    addParagraph('To begin using Lean:');
-    addList([
-      '📂 Lean project folder — Lean4Code will automatically detect your environment.',
-      '✅ If Lean 4 isn’t installed, Lean4Code handles it behind the scenes.',
-      '🛠️ No terminal setup, no command-line tools — everything is preconfigured and ready to go.'
-    ]);
-    addParagraph('You can start writing .lean files, viewing goals, and using tactics right away.');
-  
     wrapper.appendChild(document.createElement('h2')).textContent = '📚 New to Lean 4?';
     addLink('https://leanprover-community.github.io/learn.html', 'https://leanprover-community.github.io/learn.html');
   
-    wrapper.appendChild(document.createElement('h2')).textContent = '💡 Coming Soon';
-    addParagraph('We\'re working on one-click tools like:');
-    addList([
-      'Create a new Lean project from a template',
-      'LeanDojo — trace and explore Lean code from GitHub',
-      'LeanCopilot — smart AI auto-completion for Lean'
-    ]);
-    addParagraph('Stay tuned!');
+    wrapper.appendChild(document.createElement('h2')).textContent = '🚀 Getting started instantly:';
+    addParagraph('To create a new Lean project, click the ∀ symbol on the top right of this page, or hold down Control + Shift + P (Cmd + Shift + P for Mac OS), to create a new Lean project template');
+  
+    wrapper.appendChild(document.createElement('h2')).textContent = '✨ Features';
+    addParagraph('For any valid lean project, click the robot icon on the left to get started with LeanCopilot, the AI theorem proving assistant. Simply click "Setup LeanCopilot", and add "import LeanCopilot" to the top of any Lean file to start interacting with LeanCopilot!');
+    addParagraph('-Never used LeanCopilot before? Get started here: https://github.com/lean-dojo/LeanCopilot');
+  
+    addParagraph('To trace any lean project using LeanDojo, simply click the dojo icon on the left hand panel. Enter a name for the trace, and the url and the most recent commit hash (you can find it on GitHub by clicking the circular clock icon right under the green "code" button for any repo, and then clicking the copy button for any commit) of the repo you want to trace. Then, add in your GitHub personal access token. Finally, paste in the version of Lean the repo to trace is using (i.e., paste in the contents of the repo\'s "lean-toolchain" file. From there, follow the instructions on the left hand side, and wait for your trace to complete!');
+    addParagraph('-New to LeanDojo? Read up on it here: https://leandojo.org/');
+  
+    addParagraph('We\'re still working on more tools for Lean4Code, including more integrated LeanDojo features, and a implementation of LeanAgent.');
   
     const hr = document.createElement('hr');
     hr.style.margin = '2rem 0';
     wrapper.appendChild(hr);
+  
+    const noteSection = document.createElement('div');
+    noteSection.style.border = '1px solid #666';
+    noteSection.style.padding = '1rem';
+    noteSection.style.margin = '1rem 0';
+    noteSection.style.borderRadius = '4px';
+    noteSection.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+    
+    const noteTitle = document.createElement('h3');
+    noteTitle.textContent = 'Note:';
+    noteTitle.style.margin = '0 0 0.5rem 0';
+    noteSection.appendChild(noteTitle);
+    
+    const noteText = document.createElement('p');
+    noteText.textContent = 'This is the beta version of Lean4Code. This is our first iteration of the app, and is not meant to be a final product. Please report any errors you encounter using Lean4Code using the issues tab, or send an email to adkisson@wustl.edu.';
+    noteText.style.margin = '0';
+    noteSection.appendChild(noteText);
+    
+    wrapper.appendChild(noteSection);
   
     const closingNote = document.createElement('p');
     const em = document.createElement('em');
