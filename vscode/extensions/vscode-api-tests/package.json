@@ -1,6 +1,6 @@
 {
   "name": "vscode-api-tests",
-  "description": "API tests for VSCodium",
+  	"description": "API tests for Lean4Code",
   "version": "0.0.1",
   "publisher": "vscode",
   "license": "MIT",

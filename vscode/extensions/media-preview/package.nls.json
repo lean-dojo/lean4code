@@ -1,6 +1,6 @@
 {
 	"displayName": "Media Preview",
-	"description": "Provides VSCodium's built-in previews for images, audio, and video",
+	"description": "Provides Lean4Code's built-in previews for images, audio, and video",
 	"customEditor.audioPreview.displayName": "Audio Preview",
 	"customEditor.imagePreview.displayName": "Image Preview",
 	"customEditor.videoPreview.displayName": "Video Preview",

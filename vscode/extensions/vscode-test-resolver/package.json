@@ -1,6 +1,6 @@
 {
   "name": "vscode-test-resolver",
-  "description": "Test resolver for VSCodium",
+  	"description": "Test resolver for Lean4Code",
   "version": "0.0.1",
   "publisher": "vscode",
   "license": "MIT",

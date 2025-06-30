@@ -1,6 +1,6 @@
 {
-  "name": "VSCodium",
-  "short_name": "VSCodium",
+  	"name": "Lean4Code",
+	"short_name": "Lean4Code",
   "start_url": "/",
   "lang": "en-US",
   "display": "standalone",

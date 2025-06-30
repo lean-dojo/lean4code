@@ -1,5 +1,5 @@
 {
-	"description": "Emmet support for VSCodium",
+	"description": "Emmet support for Lean4Code",
 	"command.wrapWithAbbreviation": "Wrap with Abbreviation",
 	"command.removeTag": "Remove Tag",
 	"command.updateTag": "Update Tag",

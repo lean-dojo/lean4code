@@ -20,7 +20,7 @@
 			{
 				"id": "vscode.builtin-renderer",
 				"entrypoint": "./renderer-out/index.js",
-				"displayName": "VSCodium Builtin Notebook Output Renderer",
+				"displayName": "Lean4Code Builtin Notebook Output Renderer",
 				"requiresMessaging": "never",
 				"mimeTypes": [
 					"image/gif",

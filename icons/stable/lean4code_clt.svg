@@ -1,0 +1,15 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="300.000000pt" height="300.000000pt" viewBox="0 0 300.000000 300.000000"
+ preserveAspectRatio="xMidYMid meet">
+<metadata>
+Created for Lean4Code
+</metadata>
+<g transform="translate(0.000000,300.000000) scale(0.100000,-0.100000)"
+fill="#000000" stroke="none">
+<path d="M800 2800 l0 -2400 400 0 400 0 0 2400 0 2400 -400 0 -400 0 0 -2400z"/>
+<path d="M1200 600 l0 -200 1600 0 1600 0 0 200 0 200 -1600 0 -1600 0 0 -200z"/>
+</g>
+</svg> 
