@@ -107,25 +107,8 @@ export class GettingStartedPage extends EditorPane {
       wrapper.appendChild(el);
     };
   
-    const addLink = (text: string, href: string) => {
-      const p = document.createElement('p');
-      const link = document.createElement('a');
-      link.textContent = text;
-      link.href = href;
-      link.style.color = 'lightblue';
-      link.style.textDecoration = 'underline';
-      link.style.cursor = 'pointer';
-      link.target = '_blank';
-      p.textContent = 'Get started with Lean 4 👉 ';
-      p.appendChild(link);
-      wrapper.appendChild(p);
-    };
-  
     wrapper.appendChild(document.createElement('h1')).textContent = 'Welcome to Lean4Code';
     addParagraph('Welcome to Lean4Code, the customized code editor designed specifically for Lean 4!', 'p', true);
-  
-    wrapper.appendChild(document.createElement('h2')).textContent = '📚 New to Lean 4?';
-    addLink('https://leanprover-community.github.io/learn.html', 'https://leanprover-community.github.io/learn.html');
   
     wrapper.appendChild(document.createElement('h2')).textContent = '🚀 Getting started instantly:';
     addParagraph('To create a new Lean project, click the ∀ symbol on the top right of this page, or hold down Control + Shift + P (Cmd + Shift + P for Mac OS), to create a new Lean project template');
@@ -149,11 +132,6 @@ export class GettingStartedPage extends EditorPane {
     noteSection.style.margin = '1rem 0';
     noteSection.style.borderRadius = '4px';
     noteSection.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-    
-    const noteTitle = document.createElement('h3');
-    noteTitle.textContent = 'Note:';
-    noteTitle.style.margin = '0 0 0.5rem 0';
-    noteSection.appendChild(noteTitle);
     
     const noteText = document.createElement('p');
     noteText.textContent = 'This is the beta version of Lean4Code. This is our first iteration of the app, and is not meant to be a final product. Please report any errors you encounter using Lean4Code using the issues tab, or send an email to adkisson@wustl.edu.';
