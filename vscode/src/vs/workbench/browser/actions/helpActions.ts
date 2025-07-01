@@ -6,7 +6,7 @@
 import { localize, localize2 } from '../../../nls.js';
 import product from '../../../platform/product/common/product.js';
 import { isMacintosh, isLinux, language, isWeb } from '../../../base/common/platform.js';
-import { ITelemetryService } from '../../../platform/telemetry/common/telemetry.js';
+
 import { IOpenerService } from '../../../platform/opener/common/opener.js';
 import { URI } from '../../../base/common/uri.js';
 import { MenuId, Action2, registerAction2, MenuRegistry } from '../../../platform/actions/common/actions.js';
@@ -153,27 +153,7 @@ class OpenDocumentationUrlAction extends Action2 {
 	}
 }
 
-class OpenNewsletterSignupUrlAction extends Action2 {
 
-	static readonly ID = 'workbench.action.openNewsletterSignupUrl';
-	static readonly AVAILABLE = !!product.newsletterSignupUrl;
-
-	constructor() {
-		super({
-			id: OpenNewsletterSignupUrlAction.ID,
-			title: localize2('newsletterSignup', 'Signup for the VSCodium Newsletter'),
-			category: Categories.Help,
-			f1: true
-		});
-	}
-
-	run(accessor: ServicesAccessor) {
-		const productService = accessor.get(IProductService);
-		const openerService = accessor.get(IOpenerService);
-		const telemetryService = accessor.get(ITelemetryService);
-		openerService.open(URI.parse(`${productService.newsletterSignupUrl}?machineId=${encodeURIComponent(telemetryService.machineId)}`));
-	}
-}
 
 class OpenYouTubeUrlAction extends Action2 {
 
@@ -379,9 +359,7 @@ if (OpenDocumentationUrlAction.AVAILABLE) {
 	registerAction2(OpenDocumentationUrlAction);
 }
 
-if (OpenNewsletterSignupUrlAction.AVAILABLE) {
-	registerAction2(OpenNewsletterSignupUrlAction);
-}
+
 
 if (OpenYouTubeUrlAction.AVAILABLE) {
 	registerAction2(OpenYouTubeUrlAction);

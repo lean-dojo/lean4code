@@ -1,7 +1,7 @@
 Name:     @@NAME@@
 Version:  @@VERSION@@
 Release:  @@RELEASE@@.el8
-Summary:  Code editing. Redefined.
+Summary:  Lean4Code. Lean4 development simplified.
 Group:    Development/Tools
 Vendor:   Microsoft Corporation
 Packager: Visual Studio Code Team <vscode-linux@microsoft.com>

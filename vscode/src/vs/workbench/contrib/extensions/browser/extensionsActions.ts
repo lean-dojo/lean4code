@@ -106,7 +106,7 @@ export class PromptExtensionInstallFailureAction extends Action {
 		this.logService.error(this.error);
 
 		if (this.error.name === ExtensionManagementErrorCode.Unsupported) {
-			const productName = isWeb ? localize('VSCodium for Web', "{0} for the Web", this.productService.nameLong) : this.productService.nameLong;
+			const productName = isWeb ? localize('Lean4Code for Web', "{0} for the Web", this.productService.nameLong) : this.productService.nameLong;
 			const message = localize('cannot be installed', "The '{0}' extension is not available in {1}. Click 'More Information' to learn more.", this.extension.displayName || this.extension.identifier.id, productName);
 			const { confirmed } = await this.dialogService.confirm({
 				type: Severity.Info,

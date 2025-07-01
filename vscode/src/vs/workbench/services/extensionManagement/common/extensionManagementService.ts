@@ -1043,7 +1043,7 @@ export class ExtensionManagementService extends CommontExtensionManagementServic
 			}
 		}
 
-		const productName = localize('VSCodium for Web', "{0} for the Web", this.productService.nameLong);
+		const productName = localize('Lean4Code for Web', "{0} for the Web", this.productService.nameLong);
 		const virtualWorkspaceSupport = this.extensionManifestPropertiesService.getExtensionVirtualWorkspaceSupportType(manifest);
 		const virtualWorkspaceSupportReason = getWorkspaceSupportTypeMessage(manifest.capabilities?.virtualWorkspaces);
 		const hasLimitedSupport = virtualWorkspaceSupport === 'limited' || !!virtualWorkspaceSupportReason;

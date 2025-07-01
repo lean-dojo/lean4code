@@ -12,16 +12,16 @@ const sendWorkspaceInfoLabel = escape(localize('sendWorkspaceInfo', "Include my 
 const sendExtensionsLabel = escape(localize('sendExtensions', "Include my enabled extensions"));
 const sendExperimentsLabel = escape(localize('sendExperiments', "Include A/B experiment info"));
 const sendExtensionData = escape(localize('sendExtensionData', "Include additional extension info"));
-const acknowledgementsLabel = escape(localize('acknowledgements', "I acknowledge that my VSCodium version is not updated and this issue may be closed."));
+const acknowledgementsLabel = escape(localize('acknowledgements', "I acknowledge that my Lean4Code version is not updated and this issue may be closed."));
 const reviewGuidanceLabel = localize( // intentionally not escaped because of its embedded tags
 	{
 		key: 'reviewGuidanceLabel',
 		comment: [
-			'{Locked="<a href=\"https://github.com/VSCodium/vscodium/wiki/Submitting-Bugs-and-Suggestions\" target=\"_blank\">"}',
+			'{Locked="<a href=\"https://github.com/wadkisson/lean4code/issues\" target=\"_blank\">"}',
 			'{Locked="</a>"}'
 		]
 	},
-	'Before you report an issue here please <a href="https://github.com/VSCodium/vscodium/wiki/Submitting-Bugs-and-Suggestions" target="_blank">review the guidance we provide</a>. Please complete the form in English.'
+	'Before you report an issue here please <a href="https://github.com/wadkisson/lean4code/issues" target="_blank">review the guidance we provide</a>. Please complete the form in English.'
 );
 
 export default (): string => `

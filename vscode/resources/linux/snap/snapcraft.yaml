@@ -1,6 +1,6 @@
 name: @@NAME@@
 version: '@@VERSION@@'
-summary: Code editing. Redefined.
+summary: Lean4Code. Lean4 development simplified.
 description: |
   Visual Studio Code is a new choice of tool that combines the
   simplicity of a code editor with what developers need for the core

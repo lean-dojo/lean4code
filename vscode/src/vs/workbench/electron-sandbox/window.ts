@@ -249,8 +249,8 @@ export class NativeWindow extends BaseWindow {
 					label: localize('downloadArmBuild', "Download"),
 					run: () => {
 						const quality = this.productService.quality;
-						const stableURL = 'https://github.com/VSCodium/vscodium/releases/latest';
-						const insidersURL = 'https://github.com/VSCodium/vscodium-insiders/releases/latest';
+						const stableURL = 'https://github.com/wadkisson/lean4code/releases/latest';
+						const insidersURL = 'https://github.com/wadkisson/lean4code/releases/latest';
 						this.openerService.open(quality === 'stable' ? stableURL : insidersURL);
 					}
 				}],

@@ -663,7 +663,7 @@ export class BaseIssueReporterService extends Disposable {
 
 	public searchVSCodeIssues(title: string, issueDescription?: string): void {
 		if (title) {
-			this.searchGitHub('VSCodium/vscodium', title);
+			this.searchGitHub('wadkisson/lean4code', title);
 		} else {
 			this.clearSearchResults();
 		}
@@ -846,8 +846,8 @@ export class BaseIssueReporterService extends Disposable {
 
 		sourceSelect.innerText = '';
 		sourceSelect.append(this.makeOption('', localize('selectSource', "Select source"), true));
-		sourceSelect.append(this.makeOption(IssueSource.VSCode, localize('vscode', "VSCodium"), false));
-		sourceSelect.append(this.makeOption(IssueSource.Extension, localize('extension', "A VSCodium extension"), false));
+		sourceSelect.append(this.makeOption(IssueSource.VSCode, localize('vscode', "Lean4Code"), false));
+		sourceSelect.append(this.makeOption(IssueSource.Extension, localize('extension', "A Lean4Code extension"), false));
 		if (this.product.reportMarketplaceIssueUrl) {
 			sourceSelect.append(this.makeOption(IssueSource.Marketplace, localize('marketplace', "Extensions Marketplace"), false));
 		}
