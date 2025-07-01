@@ -354,7 +354,17 @@ if __name__ == "__main__":
       child.on('close', (code) => {
         this.tracingInProgress = false;
         if (code !== 0) {
-          vscode.window.showErrorMessage(`Trace failed with exit code ${code}`);
+          vscode.window.showErrorMessage(
+            `Trace failed. View full log?`,
+            'Open Log'
+          ).then(choice => {
+            if (choice === 'Open Log') {
+              const logPath = path.join(tracePath, 'trace_full_output.log');
+              vscode.workspace.openTextDocument(logPath).then(doc => {
+                vscode.window.showTextDocument(doc);
+              });
+            }
+          });
           this.traceMessage = '❌ Trace failed';
         } else {
           vscode.window.showInformationMessage('✅ Trace completed successfully');
