@@ -11,7 +11,7 @@ import { URI } from '../../../../base/common/uri.js';
 
 export const NEW_WELCOME_EXPERIENCE = 'NewWelcomeExperience';
 
-const setupIcon = registerIcon('getting-started-setup', Codicon.zap, localize('getting-started-setup-icon', "Icon for welcome page"));
+const setupIcon = registerIcon('getting-started-setup', Codicon.megaphone, localize('getting-started-setup-icon', "Icon for welcome page"));
 
 export type BuiltinGettingStartedStep = {
 	id: string;
