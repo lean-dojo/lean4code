@@ -17,6 +17,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private pythonInstalled = false;
   private leanDojoInstalled = false;
+  private leanInstalled = false;
   private tracingInProgress = false;
   private traceMessage = '';
 
@@ -32,6 +33,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
         case 'createProject': this.handleCreateProject(msg.repoUrl, msg.commitHash, msg.projectName, msg.token, msg.leanVersion); break;
         case 'installPython': this.handleInstallPython(); break;
         case 'installLeanDojo': this.handleInstallLeanDojo(); break;
+        case 'installLean': this.handleInstallLean(); break;
         case 'runTrace': this.handleRunTrace(); break;
         case 'cleanupOut': this.handleCleanupOut(); break;
       }
@@ -92,6 +94,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       // Reset state
       this.pythonInstalled = false;
       this.leanDojoInstalled = false;
+      this.leanInstalled = false;
       this.tracingInProgress = false;
       this.traceMessage = '';
 
@@ -179,14 +182,6 @@ def main():
     # Use the provided Lean version instead of detecting from lean-toolchain
     lean_version = "${leanVersion}"
     write_status(f"Using specified Lean version: {lean_version}")
-
-    if not shutil.which("elan"):
-        write_status("Installing elan via curl...")
-        subprocess.run("curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh", shell=True, check=True)
-
-    write_status("Installing specified Lean toolchain...")
-    subprocess.run(["elan", "install", lean_version], cwd=repo_path, check=False)
-    subprocess.run(["elan", "override", "set", lean_version], cwd=repo_path, check=True)
 
     write_status("Building the repo with lake...")
     subprocess.run(["lake", "build"], cwd=repo_path, check=True)
@@ -299,6 +294,79 @@ if __name__ == "__main__":
     
     vscode.window.showInformationMessage('Installing LeanDojo...');
     tryNextCommand();
+  }
+
+  private async handleInstallLean(): Promise<void> {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      vscode.window.showErrorMessage('No workspace folder open');
+      return;
+    }
+
+    const repoPath = path.join(root, 'repo');
+    const tracePath = path.join(root, 'trace');
+    
+    // Read the Lean version from the trace.py file
+    const traceScriptPath = path.join(tracePath, 'trace.py');
+    if (!fs.existsSync(traceScriptPath)) {
+      vscode.window.showErrorMessage('trace.py not found. Please create a project first.');
+      return;
+    }
+
+    try {
+      const traceScript = fs.readFileSync(traceScriptPath, 'utf8');
+      const leanVersionMatch = traceScript.match(/lean_version = "([^"]+)"/);
+      if (!leanVersionMatch) {
+        vscode.window.showErrorMessage('Could not find Lean version in trace.py');
+        return;
+      }
+      
+      const leanVersion = leanVersionMatch[1];
+      vscode.window.showInformationMessage(`Installing Lean version: ${leanVersion}...`);
+
+      // Install elan if not present
+      exec('which elan', (elanError) => {
+        if (elanError) {
+          vscode.window.showInformationMessage('Installing elan...');
+          exec('curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh', (curlError) => {
+            if (curlError) {
+              vscode.window.showErrorMessage(`Failed to install elan: ${curlError.message}`);
+              return;
+            }
+            this.installLeanToolchain(leanVersion, repoPath);
+          });
+        } else {
+          this.installLeanToolchain(leanVersion, repoPath);
+        }
+      });
+
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to read trace.py: ${error.message}`);
+    }
+  }
+
+  private installLeanToolchain(leanVersion: string, repoPath: string): void {
+    exec(`elan install ${leanVersion}`, { cwd: repoPath }, (installError, stdout, stderr) => {
+      // If already installed, treat as success
+      if (installError) {
+        const msg = installError.message || '';
+        if (msg.includes('is already installed') || stderr?.toString().includes('is already installed')) {
+          // proceed as if success
+        } else {
+          vscode.window.showErrorMessage(`Failed to install Lean toolchain: ${installError.message}`);
+          return;
+        }
+      }
+      exec(`elan override set ${leanVersion}`, { cwd: repoPath }, (overrideError) => {
+        if (overrideError) {
+          vscode.window.showErrorMessage(`Failed to set Lean override: ${overrideError.message}`);
+          return;
+        }
+        this.leanInstalled = true;
+        vscode.window.showInformationMessage(`✅ Lean version ${leanVersion} installed successfully`);
+        setTimeout(() => this.updatePanel(), 1000);
+      });
+    });
   }
 
   private async handleRunTrace(): Promise<void> {
@@ -561,6 +629,18 @@ if __name__ == "__main__":
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     const traceDoneFlagPath = path.join(root, 'out', 'trace_done.flag');
     const showCleanupButton = fs.existsSync(traceDoneFlagPath);
+    // Extract Lean version from trace.py
+    let leanVersion = '';
+    try {
+      const traceScriptPath = path.join(root, 'trace', 'trace.py');
+      if (fs.existsSync(traceScriptPath)) {
+        const traceScript = fs.readFileSync(traceScriptPath, 'utf8');
+        const match = traceScript.match(/lean_version = "([^"]+)"/);
+        if (match) {
+          leanVersion = match[1];
+        }
+      }
+    } catch {}
 
     return `
       <html>
@@ -643,8 +723,11 @@ if __name__ == "__main__":
           <button onclick="installLeanDojo()" class="${this.leanDojoInstalled ? 'completed' : ''}">
             ${this.leanDojoInstalled ? '✅ LeanDojo installed' : '📦 Step 2: Install LeanDojo'}
           </button>
+          <button onclick="installLean()" class="${this.leanInstalled ? 'completed' : ''}">
+            ${this.leanInstalled ? `✅ Lean installed (${leanVersion})` : `🔧 Step 3: Install Lean version${leanVersion ? ` ${leanVersion}` : ''}`}
+          </button>
           <button onclick="runTrace()" ${this.tracingInProgress ? 'disabled' : ''}>
-            ${this.tracingInProgress ? '🔄 ' + this.traceMessage : '🚀 Step 3: Run Trace'}
+            ${this.tracingInProgress ? '🔄 ' + this.traceMessage : '🚀 Step 4: Run Trace'}
           </button>
           
           ${showCleanupButton ? `
@@ -671,6 +754,12 @@ if __name__ == "__main__":
           function installLeanDojo() {
             if (!${this.leanDojoInstalled}) {
               vscode.postMessage({ command: 'installLeanDojo' });
+            }
+          }
+          
+          function installLean() {
+            if (!${this.leanInstalled}) {
+              vscode.postMessage({ command: 'installLean' });
             }
           }
           
