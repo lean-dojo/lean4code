@@ -105,12 +105,11 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       // Create folders
       const tracePath = path.join(projectPath, 'trace');
       const repoPath = path.join(projectPath, 'repo');
-      const outPath = path.join(projectPath, 'out');
 
       fs.mkdirSync(projectPath, { recursive: true });
       fs.mkdirSync(tracePath, { recursive: true });
       fs.mkdirSync(repoPath, { recursive: true });
-      fs.mkdirSync(outPath, { recursive: true });
+      // Note: out folder will be created by the trace function
 
       // Create trace script
       const traceScript = this.generateTraceScript(repoUrl, commitHash, token.trim(), leanVersion.trim());
@@ -160,8 +159,7 @@ sys.stdout = log_file
 sys.stderr = log_file
 
 def write_status(message, status="info"):
-    status_file = "../out/status.json"
-    os.makedirs(os.path.dirname(status_file), exist_ok=True)
+    status_file = "status.json"
     with open(status_file, "w") as f:
         json.dump({
             "message": message,
@@ -190,21 +188,11 @@ def main():
     from lean_dojo import LeanGitRepo
     from lean_dojo.data_extraction.trace import trace
 
+    # Compute out directory path
+    out_dir = os.path.abspath("../out")
+    
     repo = LeanGitRepo("${repoUrl}", "${commitHash}")
-    traced_path = trace(repo)
-
-    write_status("Trace complete! Copying output...", "success")
-    out = "../out"
-
-    try:
-        shutil.copytree(traced_path.root_dir, out, dirs_exist_ok=True)
-        # ✅ Create marker flag for success
-        with open(os.path.join(out, "trace_done.flag"), "w") as f:
-            f.write("Trace completed successfully.")
-        write_status("✅ Trace completed successfully", "success")
-    except Exception as e:
-        write_status(f"🚨 Failed to copy traced output: {type(e).__name__}: {str(e)}", "error")
-        raise
+    traced_path = trace(repo, dst_dir = out_dir)
 
 if __name__ == "__main__":
     try:
