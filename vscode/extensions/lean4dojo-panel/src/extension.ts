@@ -198,7 +198,7 @@ def main():
     out_dir = os.path.abspath("../out")
     
     repo = LeanGitRepo("${repoUrl}", "${commitHash}")
-    traced_path = trace(repo, dst_dir = out_dir)
+    traced_path = trace(repo, dst_dir = out_dir,build_deps =False)
 
 if __name__ == "__main__":
     try:
