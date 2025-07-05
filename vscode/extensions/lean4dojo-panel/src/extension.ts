@@ -105,14 +105,18 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       // Create folders
       const tracePath = path.join(projectPath, 'trace');
       const repoPath = path.join(projectPath, 'repo');
+      const cachePath = path.join(projectPath, 'cache');
+      const tmpPath   = path.join(projectPath, 'tmp');
 
       fs.mkdirSync(projectPath, { recursive: true });
       fs.mkdirSync(tracePath, { recursive: true });
       fs.mkdirSync(repoPath, { recursive: true });
+      fs.mkdirSync(cachePath,  { recursive: true });
+      fs.mkdirSync(tmpPath,    { recursive: true }); 
       // Note: out folder will be created by the trace function
 
       // Create trace script
-      const traceScript = this.generateTraceScript(repoUrl, commitHash, token.trim(), leanVersion.trim());
+      const traceScript = this.generateTraceScript( repoUrl, commitHash, token.trim(), leanVersion.trim(), cachePath, tmpPath);
       fs.writeFileSync(path.join(tracePath, 'trace.py'), traceScript);
 
       // Clone repo
@@ -142,7 +146,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     }
   }
 
-  private generateTraceScript(repoUrl: string, commitHash: string, token: string, leanVersion: string): string {
+  private generateTraceScript( repoUrl: string, commitHash: string, token: string, leanVersion: string, cacheDir: string, tmpDir: string): string {
     return `import subprocess
 import shutil
 import os
@@ -152,6 +156,8 @@ import sys
 
 # Set GitHub token for unlimited API access
 os.environ['GITHUB_TOKEN'] = '${token}'
+os.environ['CACHE_DIR'] = os.path.abspath('${cacheDir}')
+os.environ['TMPDIR'] = os.path.abspath('${tmpDir}')
 
 # Line-buffered logging
 log_file = open("trace_full_output.log", "w", buffering=1)
