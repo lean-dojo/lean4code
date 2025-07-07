@@ -158,7 +158,6 @@ import sys
 os.environ['GITHUB_TOKEN'] = '${token}'
 os.environ['CACHE_DIR'] = os.path.abspath('${cacheDir}')
 os.environ['TMP_DIR'] = os.path.abspath('${tmpDir}')
-os.enviorn['LOAD_USED_PACKAGES_ONLY'] = "0"
 
 # Line-buffered logging
 log_file = open("trace_full_output.log", "w", buffering=1)
