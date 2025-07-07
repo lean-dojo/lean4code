@@ -39,6 +39,19 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       }
     });
   }
+    /** Recursively delete every `.git` directory under `dir`. */
+  private removeAllGitFolders(dir: string): void {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === '.git') {
+          fs.rmSync(fullPath, { recursive: true, force: true });
+        } else {
+          this.removeAllGitFolders(fullPath);
+        }
+      }
+    }
+  }
 
   public updatePanel(): void {
     if (this._view) {
@@ -415,6 +428,7 @@ if __name__ == "__main__":
 
       child.on('close', (code) => {
         this.tracingInProgress = false;
+        this.removeAllGitFolders(root);
         if (code !== 0) {
           vscode.window.showErrorMessage(
             `Trace failed. View full log?`,
