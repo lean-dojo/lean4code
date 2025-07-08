@@ -72,7 +72,8 @@ npm run build</code></pre>
 <pre><code>NODE_OPTIONS="--max-old-space-size=8192" npx gulp vscode-linux-x64</code></pre>
 
 <h4>Windows (64-bit)</h4>
-<pre><code>NODE_OPTIONS="--max-old-space-size=8192" npx gulp vscode-win32-x64</code></pre>
+<pre><code>$env:NODE_OPTIONS="--max-old-space-size=8192"
+npx gulp vscode-win32-x64</code></pre>
 
 <p>You can bump memory up to <code>--max-old-space-size=16384</code> or more if needed.</p>
 
