@@ -670,7 +670,6 @@ if __name__ == "__main__":
   private getLeanProjectHtml(): string {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     const traceDoneFlagPath = path.join(root, 'out', 'trace_done.flag');
-    const showCleanupButton = fs.existsSync(traceDoneFlagPath);
     // Extract Lean version from trace.py
     let leanVersion = '';
     try {
@@ -744,12 +743,6 @@ if __name__ == "__main__":
             border: 1px solid var(--vscode-input-border);
             display: ${this.tracingInProgress ? 'block' : 'none'};
           }
-          .cleanup-subtext {
-            display: block;
-            font-size: 0.65rem;
-            opacity: 0.8;
-            margin-top: 0.25rem;
-          }
         </style>
       </head>
       <body>
@@ -771,13 +764,6 @@ if __name__ == "__main__":
           <button onclick="runTrace()" ${this.tracingInProgress ? 'disabled' : ''}>
             ${this.tracingInProgress ? '🔄 ' + this.traceMessage : '🚀 Step 4: Run Trace'}
           </button>
-          
-          ${showCleanupButton ? `
-          <button onclick="cleanupOut()">
-            🧹 Cleanup tracing artifacts
-            <span class="cleanup-subtext">(Delete lake and elan installation and related files from out folder)</span>
-          </button>
-          ` : ''}
           
           <div class="trace-info">
             Tracing is completed when your project's "out" folder is populated; this may take hours
