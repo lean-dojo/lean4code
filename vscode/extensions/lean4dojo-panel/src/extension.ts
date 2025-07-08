@@ -20,6 +20,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
   private leanInstalled = false;
   private tracingInProgress = false;
   private traceMessage = '';
+  private buildDeps = false;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -36,6 +37,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
         case 'installLean': this.handleInstallLean(); break;
         case 'runTrace': this.handleRunTrace(); break;
         case 'cleanupOut': this.handleCleanupOut(); break;
+        case 'toggleBuildDeps': this.toggleBuildDeps(); break;
       }
     });
   }
@@ -52,6 +54,32 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       }
     }
   }
+  private toggleBuildDeps(): void {
+    this.buildDeps = !this.buildDeps;
+    console.log('buildDeps toggled to:', this.buildDeps);
+    vscode.window.showInformationMessage(`Build deps: ${this.buildDeps ? 'ON' : 'OFF'}`);
+    
+    // Update the trace.py file with the new buildDeps setting
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (root) {
+      const traceScriptPath = path.join(root, 'trace', 'trace.py');
+      if (fs.existsSync(traceScriptPath)) {
+        try {
+          const traceScript = fs.readFileSync(traceScriptPath, 'utf8');
+          const updatedScript = traceScript.replace(
+            /build_deps = \w+/,
+            `build_deps = ${this.buildDeps ? 'True' : 'False'}`
+          );
+          fs.writeFileSync(traceScriptPath, updatedScript);
+          console.log('Updated trace.py with build_deps =', this.buildDeps);
+        } catch (error) {
+          console.error('Failed to update trace.py:', error);
+        }
+      }
+    }
+    
+    this.updatePanel();
+  }  
 
   public updatePanel(): void {
     if (this._view) {
@@ -211,7 +239,7 @@ def main():
     out_dir = os.path.abspath("../out")
     
     repo = LeanGitRepo("${repoUrl}", "${commitHash}")
-    traced_path = trace(repo, dst_dir = out_dir,build_deps =False)
+    traced_path = trace(repo, dst_dir = out_dir, build_deps = ${this.buildDeps ? 'True' : 'False'})
 
 if __name__ == "__main__":
     try:
@@ -574,6 +602,8 @@ if __name__ == "__main__":
           
           <div class="field-label">Lean Version</div>
           <input id="leanVersionInput" type="text" placeholder="e.g., leanprover/lean4:v4.21.0-rc3" />
+
+          <button onclick="toggleBuildDeps()">🔁 Toggle build_deps (Currently: ${this.buildDeps ? 'True' : 'False'})</button>
           
           <button onclick="createProject()">🚀 Create Project</button>
         </div>
@@ -627,6 +657,10 @@ if __name__ == "__main__":
               createProject();
             }
           });
+          
+          function toggleBuildDeps() {
+            vscode.postMessage({ command: 'toggleBuildDeps' });
+          }
         </script>
       </body>
       </html>
@@ -780,6 +814,10 @@ if __name__ == "__main__":
           function cleanupOut() {
             vscode.postMessage({ command: 'cleanupOut' });
           }
+            function toggleBuildDeps() {
+            vscode.postMessage({ command: 'toggleBuildDeps' });
+          }
+
         </script>
       </body>
       </html>
