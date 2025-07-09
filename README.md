@@ -18,8 +18,7 @@ This is our solution, a code editor with a truly intuitive Lean experience.
 
 <p>
 Lean4Code is supported across all three major operating systems.<br />
-<strong>Note:</strong> We’ve developed, tested, and debugged Lean4Code on Mac.
-We are still running tests for Linux and Windows versions of Lean4Code.
+You can find the most recently compiled, prebuilt release of Lean4Code under the releases tab to the right of this page.
 </p>
 
 <h2>Built in features:</h2>
