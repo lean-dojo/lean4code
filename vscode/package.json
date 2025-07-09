@@ -9,6 +9,16 @@
   "main": "./out/main.js",
   "type": "module",
   "private": true,
+
+  "enabledApiProposals": [
+  "notebookRendererMessaging",
+  "textResourceProperties",
+  "inlineCompletions",
+  "chat",
+  "testing",
+  "fileSearchProvider"
+  ],
+
   "scripts": {
     "test": "echo Please run any of the test scripts from the scripts folder.",
     "test-browser": "npx playwright install && node test/unit/browser/index.js",
