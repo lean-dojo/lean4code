@@ -7,7 +7,7 @@
 <h2>What is this / why does this exist?</h2>
 
 <p>
-This repo contains the build files for Lean4Code, a VSCodium based Lean-native code editor.
+This repo contains the build files and official releases for Lean4Code, a VSCodium based Lean-native code editor.
 We wanted to minimize the bar of entry for getting started with Lean and using LeanDojo tools.
 This is our solution, a code editor with a truly intuitive Lean experience.
 </p>
