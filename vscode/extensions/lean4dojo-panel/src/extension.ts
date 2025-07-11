@@ -809,6 +809,10 @@ if __name__ == "__main__":
             }
           }
           
+          function oneClickTrace(){
+            vscode.postMessage({ command: 'oneClickTrace' });
+          }
+
           function cleanupOut() {
             vscode.postMessage({ command: 'cleanupOut' });
           }
