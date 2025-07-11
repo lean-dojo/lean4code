@@ -73,7 +73,14 @@ moreLinkArgs = [
         panelInstance.updateWebviewDownloading();
 
         await run('lake update LeanCopilot', '📦 Running: lake update LeanCopilot...');
-        await run('lake exe LeanCopilot/download', '⬇️ Downloading models...');
+        const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+        const cachePath = path.join(homeDir, '.cache', 'lean_copilot');
+        if (fs.existsSync(cachePath)) {
+          vscode.window.showInformationMessage('ℹ️ Models already downloaded, skipping download step.');
+        } else {
+          await run('lake exe LeanCopilot/download', '⬇️ Downloading models...');
+        }
+
         await run('lake build', '🔧 Building project...');
 
         vscode.window.showInformationMessage('🤖 LeanCopilot successfully installed!');
