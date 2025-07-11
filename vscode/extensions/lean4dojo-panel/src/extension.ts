@@ -38,6 +38,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
         case 'runTrace': this.handleRunTrace(); break;
         case 'cleanupOut': this.handleCleanupOut(); break;
         case 'toggleBuildDeps': this.toggleBuildDeps(); break;
+        case 'oneClickTrace' : this.oneClickTrace(); break;
       }
     });
   }
@@ -480,6 +481,13 @@ if __name__ == "__main__":
 
     tryNextCommand();
   }
+  private async oneClickTrace(){
+    vscode.window.showInformationMessage('Running trace...');
+    await this.handleInstallPython();
+    await this.handleInstallLeanDojo();
+    await this.handleInstallLean();
+    await this.handleRunTrace();
+  }
 
   private async handleCleanupOut(): Promise<void> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -764,6 +772,10 @@ if __name__ == "__main__":
           <button onclick="runTrace()" ${this.tracingInProgress ? 'disabled' : ''}>
             ${this.tracingInProgress ? '🔄 ' + this.traceMessage : '🚀 Step 4: Run Trace'}
           </button>
+            <button onclick="oneClickTrace()"> Click here to trace ur repo
+          </button>
+
+
           
           <div class="trace-info">
             Tracing is completed when your project's "out" folder is populated; this may take hours
