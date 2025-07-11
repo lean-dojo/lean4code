@@ -84,6 +84,67 @@ moreLinkArgs = [
       }
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('leanCopilot.runModelsRemotely', async () => {
+      const folder = vscode.workspace.workspaceFolders?.[0];
+      if (!folder) {
+        vscode.window.showErrorMessage('No workspace folder found.');
+        return;
+      }
+
+      const projectPath = folder.uri.fsPath;
+      const lakefile = path.join(projectPath, 'lakefile.toml');
+
+      if (!fs.existsSync(lakefile)) {
+        vscode.window.showErrorMessage('Could not find lakefile.toml in project.');
+        return;
+      }
+
+      let content = fs.readFileSync(lakefile, 'utf-8');
+      let modified = false;
+
+      if (!content.includes('external_api')) {
+        content += `
+
+[[require]]
+name = "external_api"
+git = "https://github.com/wadkisson/external_api"
+rev = "main"
+`;
+        modified = true;
+      }
+
+      if (modified) {
+        fs.writeFileSync(lakefile, content);
+        vscode.window.showInformationMessage('✅ lakefile.toml updated with external_api config.');
+      } else {
+        vscode.window.showInformationMessage('ℹ️ external_api was already configured.');
+      }
+
+      const run = (cmd: string, label: string) =>
+        new Promise<void>((resolve, reject) => {
+          vscode.window.showInformationMessage(label);
+          exec(cmd, { cwd: projectPath }, (err, stdout, stderr) => {
+            if (err) reject(stderr || stdout);
+            else resolve();
+          });
+        });
+
+      try {
+        panelInstance.updateWebviewDownloading();
+
+        await run('lake update', '📦 Running: lake update...');
+        await run('lake build', '🔧 Building project...');
+
+        vscode.window.showInformationMessage('✅ Models ready to run remotely!');
+        context.workspaceState.update('leanCopilotInstalled', true);
+        vscode.commands.executeCommand('leanCopilotPanel.refresh');
+      } catch (e: any) {
+        vscode.window.showErrorMessage('❌ Setup failed:\n' + e.toString());
+      }
+    })
+  );
 }
 
 class LeanCopilotPanel implements vscode.WebviewViewProvider {
@@ -102,6 +163,10 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
       if (msg.command === 'setup') {
         this.updateWebviewDownloading();
         vscode.commands.executeCommand('leanCopilot.setupToml');
+      }
+      if (msg.command === 'runModelsRemotely') {
+        this.updateWebviewDownloading();
+        vscode.commands.executeCommand('leanCopilot.runModelsRemotely');
       }
     });
 
@@ -162,11 +227,13 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
           <style>
             body {
               display: flex;
+              flex-direction: column;
               justify-content: center;
               align-items: center;
               height: 100vh;
               margin: 0;
               background: var(--vscode-sideBar-background);
+              gap: 1rem;
             }
             button {
               font-size: 1.4rem;
@@ -180,14 +247,24 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
             button:hover {
               background-color: #005fa3;
             }
+            .remote-button {
+              background-color: #28a745;
+            }
+            .remote-button:hover {
+              background-color: #218838;
+            }
           </style>
         </head>
         <body>
-          <button onclick="setup()">🤖 Setup LeanCopilot</button>
+          <button onclick="setup()">Download LeanCopilot locally</button>
+          <button class="remote-button" onclick="runModelsRemotely()">Run models remotely</button>
           <script>
             const vscode = acquireVsCodeApi();
             function setup() {
               vscode.postMessage({ command: 'setup' });
+            }
+            function runModelsRemotely() {
+              vscode.postMessage({ command: 'runModelsRemotely' });
             }
           </script>
         </body>
