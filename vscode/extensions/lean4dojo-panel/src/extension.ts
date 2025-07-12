@@ -755,24 +755,7 @@ if __name__ == "__main__":
       </head>
       <body>
         <div class="container">
-          <div class="info">
-            <strong>LeanDojo Project</strong><br>
-            Follow these steps in order to set up and run your trace.
-          </div>
-          
-          <button onclick="installPython()" class="${this.pythonInstalled ? 'completed' : ''}">
-            ${this.pythonInstalled ? '✅ Python installed' : '🐍 Step 1: Install Python'}
-          </button>
-          <button onclick="installLeanDojo()" class="${this.leanDojoInstalled ? 'completed' : ''}">
-            ${this.leanDojoInstalled ? '✅ LeanDojo installed' : '📦 Step 2: Install LeanDojo'}
-          </button>
-          <button onclick="installLean()" class="${this.leanInstalled ? 'completed' : ''}">
-            ${this.leanInstalled ? `✅ Lean installed (${leanVersion})` : `🔧 Step 3: Install Lean version${leanVersion ? ` ${leanVersion}` : ''}`}
-          </button>
-          <button onclick="runTrace()" ${this.tracingInProgress ? 'disabled' : ''}>
-            ${this.tracingInProgress ? '🔄 ' + this.traceMessage : '🚀 Step 4: Run Trace'}
-          </button>
-            <button onclick="oneClickTrace()"> Click here to trace ur repo
+            <button onclick="this.innerText='Tracing...'; this.disabled=true; oneClickTrace()">🔧 Click here to trace your repo!</button>
           </button>
 
 
@@ -784,31 +767,7 @@ if __name__ == "__main__":
         
         <script>
           const vscode = acquireVsCodeApi();
-          
-          function installPython() {
-            if (!${this.pythonInstalled}) {
-              vscode.postMessage({ command: 'installPython' });
-            }
-          }
-          
-          function installLeanDojo() {
-            if (!${this.leanDojoInstalled}) {
-              vscode.postMessage({ command: 'installLeanDojo' });
-            }
-          }
-          
-          function installLean() {
-            if (!${this.leanInstalled}) {
-              vscode.postMessage({ command: 'installLean' });
-            }
-          }
-          
-          function runTrace() {
-            if (!${this.tracingInProgress}) {
-              vscode.postMessage({ command: 'runTrace' });
-            }
-          }
-          
+        
           function oneClickTrace(){
             vscode.postMessage({ command: 'oneClickTrace' });
           }
