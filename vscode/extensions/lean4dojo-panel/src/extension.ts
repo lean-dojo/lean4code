@@ -474,6 +474,7 @@ if __name__ == "__main__":
         } else {
           vscode.window.showInformationMessage('✅ Trace completed successfully');
           this.traceMessage = '✅ Trace completed successfully!';
+          fs.writeFileSync(path.join(root, 'out', 'trace_done.flag'), 'done');
         }
         this.updatePanel();
       });
@@ -678,6 +679,8 @@ if __name__ == "__main__":
   private getLeanProjectHtml(): string {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     const traceDoneFlagPath = path.join(root, 'out', 'trace_done.flag');
+    const traceAlreadyCompleted = fs.existsSync(traceDoneFlagPath);
+    
     // Extract Lean version from trace.py
     let leanVersion = '';
     try {
@@ -754,9 +757,12 @@ if __name__ == "__main__":
         </style>
       </head>
       <body>
-        <div class="container">
-            <button onclick="this.innerText='Tracing...'; this.disabled=true; oneClickTrace()">🔧 Click here to trace your repo!</button>
-          </button>
+      <button 
+        onclick="oneClickTrace()" 
+        id="traceButton" 
+        ${traceAlreadyCompleted ? 'disabled' : ''}>
+        ${traceAlreadyCompleted ? '✅ Trace completed' : '🔧 Click here to trace your repo!'}
+      </button>
 
 
           
@@ -768,7 +774,10 @@ if __name__ == "__main__":
         <script>
           const vscode = acquireVsCodeApi();
         
-          function oneClickTrace(){
+           function oneClickTrace() {
+            const button = document.getElementById('traceButton');
+            button.disabled = true;
+            button.innerText = '🔄 Tracing repo...';
             vscode.postMessage({ command: 'oneClickTrace' });
           }
 
