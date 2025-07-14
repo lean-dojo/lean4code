@@ -40,7 +40,7 @@ cd lean4code</code></pre>
   </li>
 
   <li>Install npm in vscode dir<br />
-    - From the main vscode directory:
+    - From the main vscode directory (lean4code/vscode):
     <pre><code>npm install</code></pre>
   </li>
 
