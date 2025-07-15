@@ -39,7 +39,7 @@ You can find the most recently compiled, prebuilt release of Lean4Code under the
 cd lean4code</code></pre>
   </li>
 
-  <li>Install npm in vscode dir / <strong>⚠️WINDOWS USERS⚠️ - Extra setup is required here. Check the end of the README and come back to this part</strong>strong><br />
+  <li>Install npm in vscode dir / <strong>⚠️WINDOWS USERS⚠️ - Extra setup is required here. Check the end of the README and come back to this part</strong><br />
     - From the main vscode directory (lean4code/vscode):
     <pre><code>npm install</code></pre>
   </li>
