@@ -39,7 +39,7 @@ You can find the most recently compiled, prebuilt release of Lean4Code under the
 cd lean4code</code></pre>
   </li>
 
-  <li>Install npm in vscode dir<br />
+  <li>Install npm in vscode dir / <strong>⚠️WINDOWS USERS⚠️ - Extra setup is required here. Check the end of the README and come back to this part</strong>strong><br />
     - From the main vscode directory (lean4code/vscode):
     <pre><code>npm install</code></pre>
   </li>
@@ -79,3 +79,23 @@ npx gulp vscode-win32-x64</code></pre>
 <hr />
 
 <p>And that’s it! We’ve designed the app to be as intuitive as possible. The Welcome Screen will guide you through how to use the built in LeanDojo tools.</p>
+
+<h2>⚠️Windows users⚠️</h2>
+
+<p>
+Building Lean4Code on Windows requires Visual Studio Build Tools for native dependencies. Follow these steps to download Visual Studio Build Tools and continue building Lean4Code.
+</p>
+
+<ol>
+  <li>Download Visual Studio Build Tools:
+    <a href="https://visualstudio.microsoft.com/downloads/">https://visualstudio.microsoft.com/downloads/</a>
+  </li>
+  <li>Under the "Community" tab, click "Free Download"</li>
+  <li>Run the installer</li>
+  <li>In the installer:
+    <ul>
+      <li>Go to "Workloads", then check "Desktop development with C++"</li>
+      <li>Then go to the "Individual Components" tab,and then search for and enable "MSVC v142 - VS 2019 C++ x64/x86 Spectre-mitigated libs" and "Windows 10/11 SDK"</li>
+    </ul>
+  </li>
+  <li>Apply changes, wait for installation, then restart your computer. From here, you can continue with build instruction #2 as normal.</li>
