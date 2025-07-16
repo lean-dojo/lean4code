@@ -95,7 +95,7 @@ Building Lean4Code on Windows requires Visual Studio Build Tools for native depe
   <li>In the installer:
     <ul>
       <li>Go to "Workloads", then check "Desktop development with C++"</li>
-      <li>Then go to the "Individual Components" tab,and then search for and enable "MSVC v142 - VS 2019 C++ x64/x86 Spectre-mitigated libs" and "Windows 10/11 SDK"</li>
+      <li>Then go to the "Individual Components" tab, and then search for and enable "MSVC v143 - VS 2022 C++ x64/x86 Spectre-mitigated libs (Latest)"</li>
     </ul>
   </li>
   <li>Apply changes, wait for installation, then restart your computer. From here, you can continue with build instruction #2 as normal.</li>
