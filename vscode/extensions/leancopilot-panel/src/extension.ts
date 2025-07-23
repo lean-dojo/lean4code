@@ -21,41 +21,66 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       const projectPath = folder.uri.fsPath;
-      const lakefile = path.join(projectPath, 'lakefile.toml');
+      const lakefileToml = path.join(projectPath, 'lakefile.toml');
+      const lakefileLean = path.join(projectPath, 'lakefile.lean');
 
-      if (!fs.existsSync(lakefile)) {
-        vscode.window.showErrorMessage('Could not find lakefile.toml in project.');
+      let fileType: 'toml' | 'lean' | undefined;
+      let lakefile: string;
+      if (fs.existsSync(lakefileToml)) {
+        fileType = 'toml';
+        lakefile = lakefileToml;
+      } else if (fs.existsSync(lakefileLean)) {
+        fileType = 'lean';
+        lakefile = lakefileLean;
+      } else {
+        vscode.window.showErrorMessage('Could not find lakefile.toml or lakefile.lean in project.');
         return;
       }
 
       let content = fs.readFileSync(lakefile, 'utf-8');
       let modified = false;
 
-      if (!content.includes('LeanCopilot')) {
-        content += `
+      if (fileType === 'toml') {
+        if (!content.includes('LeanCopilot')) {
+          content += `
 
 [[require]]
 name = "LeanCopilot"
 git = "https://github.com/lean-dojo/LeanCopilot.git"
 rev = "main"
 `;
-        modified = true;
-      }
-
-      if (!content.includes('moreLinkArgs')) {
-        content += `
+          modified = true;
+        }
+        if (!content.includes('moreLinkArgs')) {
+          content += `
 
 moreLinkArgs = [
   "-L./.lake/packages/LeanCopilot/.lake/build/lib",
   "-lctranslate2"
 ]
 `;
-        modified = true;
+          modified = true;
+        }
+      } else if (fileType === 'lean') {
+        if (!content.includes('require LeanCopilot')) {
+          content += `\nrequire LeanCopilot from git \"https://github.com/lean-dojo/LeanCopilot.git\" @ \"main\"\n`;
+          modified = true;
+        }
+        if (!content.includes('moreLinkArgs')) {
+          const packageBlockMatch = content.match(/package\s+«[^»]+»\s*{[\s\S]*?}/);
+          if (packageBlockMatch) {
+            const newBlock = packageBlockMatch[0].replace(/}$/, `  moreLinkArgs := #[\n    \"-L./.lake/packages/LeanCopilot/.lake/build/lib\",\n    \"-lctranslate2\"\n  ]\n}`);
+            content = content.replace(packageBlockMatch[0], newBlock);
+          } else {
+            content += `\npackage «my-package» {\n  moreLinkArgs := #[\n    \"-L./.lake/packages/LeanCopilot/.lake/build/lib\",\n    \"-lctranslate2\"\n  ]\n}\n`;
+          }
+          modified = true;
+        }
       }
 
       if (modified) {
         fs.writeFileSync(lakefile, content);
-        vscode.window.showInformationMessage('✅ lakefile.toml updated with LeanCopilot config.');
+        vscode.window.showInformationMessage(`✅ ${fileType === 'toml' ? 'lakefile.toml' : 'lakefile.lean'} updated with LeanCopilot config.`);
       } else {
         vscode.window.showInformationMessage('ℹ️ LeanCopilot was already configured.');
       }
@@ -101,30 +126,40 @@ moreLinkArgs = [
       }
 
       const projectPath = folder.uri.fsPath;
-      const lakefile = path.join(projectPath, 'lakefile.toml');
+      const lakefileToml = path.join(projectPath, 'lakefile.toml');
+      const lakefileLean = path.join(projectPath, 'lakefile.lean');
 
-      if (!fs.existsSync(lakefile)) {
-        vscode.window.showErrorMessage('Could not find lakefile.toml in project.');
+      let fileType: 'toml' | 'lean' | undefined;
+      let lakefile: string;
+      if (fs.existsSync(lakefileToml)) {
+        fileType = 'toml';
+        lakefile = lakefileToml;
+      } else if (fs.existsSync(lakefileLean)) {
+        fileType = 'lean';
+        lakefile = lakefileLean;
+      } else {
+        vscode.window.showErrorMessage('Could not find lakefile.toml or lakefile.lean in project.');
         return;
       }
 
       let content = fs.readFileSync(lakefile, 'utf-8');
       let modified = false;
 
-      if (!content.includes('external_api')) {
-        content += `
-
-[[require]]
-name = "external_api"
-git = "https://github.com/wadkisson/external_api"
-rev = "main"
-`;
-        modified = true;
+      if (fileType === 'toml') {
+        if (!content.includes('external_api')) {
+          content += `\n\n[[require]]\nname = \"external_api\"\ngit = \"https://github.com/wadkisson/external_api\"\nrev = \"main\"\n`;
+          modified = true;
+        }
+      } else if (fileType === 'lean') {
+        if (!content.includes('require external_api')) {
+          content += `\nrequire external_api from git \"https://github.com/wadkisson/external_api\" @ \"main\"\n`;
+          modified = true;
+        }
       }
 
       if (modified) {
         fs.writeFileSync(lakefile, content);
-        vscode.window.showInformationMessage('✅ lakefile.toml updated with external_api config.');
+        vscode.window.showInformationMessage(`✅ ${fileType === 'toml' ? 'lakefile.toml' : 'lakefile.lean'} updated with external_api config.`);
       } else {
         vscode.window.showInformationMessage('ℹ️ external_api was already configured.');
       }
