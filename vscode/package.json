@@ -20,13 +20,14 @@
   ],
 
   "scripts": {
+    "build-extensions" : "cd extensions/lean4dojo-panel && npm install && npm run compile && cd ../leancopilot-panel && npm install && npm run compile && cd ../lean4 && npm install && npm run build",
     "test": "echo Please run any of the test scripts from the scripts folder.",
     "test-browser": "npx playwright install && node test/unit/browser/index.js",
     "test-browser-no-install": "node test/unit/browser/index.js",
     "test-node": "mocha test/unit/node/index.js --delay --ui=tdd --timeout=5000 --exit",
     "test-extension": "vscode-test",
     "preinstall": "node build/npm/preinstall.js",
-    "postinstall": "node build/npm/postinstall.js",
+    "postinstall": "node build/npm/postinstall.js && npm run build-extensions",
     "compile": "node ./node_modules/gulp/bin/gulp.js compile",
     "watch": "npm-run-all -lp watch-client watch-extensions",
     "watchd": "deemon npm run watch",
