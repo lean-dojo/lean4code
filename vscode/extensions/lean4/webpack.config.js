@@ -4,6 +4,8 @@ const path = require('path')
 const webpack = require('webpack')
 const CopyPlugin = require('copy-webpack-plugin')
 
+const toPosix = p => p.split(path.sep).join('/')
+
 /**
  * @typedef Env
  * @prop {boolean} production
@@ -47,7 +49,6 @@ const getWebviewConfig = env => ({
         new CopyPlugin({
             patterns: [
                 {
-                    // See https://github.com/webpack-contrib/copy-webpack-plugin/tree/e2274daad21baae3020819aa29ab903bd9992cce#yarn-workspaces-and-monorepos
                     from: `${path.dirname(require.resolve('@leanprover/infoview/package.json'))}/dist`,
                     to: path.resolve(__dirname, 'dist', 'lean4-infoview'),
                 },
@@ -91,11 +92,11 @@ const getLoogleViewConfig = env => ({
                     to: path.resolve(__dirname, 'dist', 'loogleview', 'static'),
                 },
                 {
-                    from: '../node_modules/@vscode/codicons/dist',
+                    from: toPosix(path.resolve(__dirname, '../node_modules/@vscode/codicons/dist')),
                     to: path.resolve(__dirname, 'dist', 'loogleview', 'static', 'codicons'),
                 },
                 {
-                    from: '../node_modules/@vscode-elements/elements/dist',
+                    from: toPosix(path.resolve(__dirname, '../node_modules/@vscode-elements/elements/dist')),
                     to: path.resolve(__dirname, 'dist', 'loogleview', 'static', 'elements'),
                 },
             ],
@@ -138,11 +139,11 @@ const getMoogleViewConfig = env => ({
                     to: path.resolve(__dirname, 'dist', 'moogleview', 'static'),
                 },
                 {
-                    from: '../node_modules/@vscode/codicons/dist',
+                    from: toPosix(path.resolve(__dirname, '../node_modules/@vscode/codicons/dist')),
                     to: path.resolve(__dirname, 'dist', 'moogleview', 'static', 'codicons'),
                 },
                 {
-                    from: '../node_modules/@vscode-elements/elements/dist',
+                    from: toPosix(path.resolve(__dirname, '../node_modules/@vscode-elements/elements/dist')),
                     to: path.resolve(__dirname, 'dist', 'moogleview', 'static', 'elements'),
                 },
             ],
@@ -181,7 +182,7 @@ const getAbbreviationViewConfig = env => ({
         new CopyPlugin({
             patterns: [
                 {
-                    from: '../node_modules/@vscode-elements/elements/dist',
+                    from: toPosix(path.resolve(__dirname, '../node_modules/@vscode-elements/elements/dist')),
                     to: path.resolve(__dirname, 'dist', 'abbreviationview', 'static', 'elements'),
                 },
             ],
