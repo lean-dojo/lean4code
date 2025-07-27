@@ -26,7 +26,7 @@
     "test-browser-no-install": "node test/unit/browser/index.js",
     "test-node": "mocha test/unit/node/index.js --delay --ui=tdd --timeout=5000 --exit",
     "test-extension": "vscode-test",
-    "preinstall": "node build/npm/preinstall.js",
+    "preinstall": "npm install --save-dev @types/vscode && echo 'ran npm install --save-dev @types/vscode successfully' && node build/npm/preinstall.js",
     "postinstall": "node build/npm/postinstall.js && npm run build-extensions",
     "compile": "node ./node_modules/gulp/bin/gulp.js compile",
     "watch": "npm-run-all -lp watch-client watch-extensions",
