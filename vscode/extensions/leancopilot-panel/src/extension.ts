@@ -116,77 +116,6 @@ moreLinkArgs = [
       }
     })
   );
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand('leanCopilot.runModelsRemotely', async () => {
-      const folder = vscode.workspace.workspaceFolders?.[0];
-      if (!folder) {
-        vscode.window.showErrorMessage('No workspace folder found.');
-        return;
-      }
-
-      const projectPath = folder.uri.fsPath;
-      const lakefileToml = path.join(projectPath, 'lakefile.toml');
-      const lakefileLean = path.join(projectPath, 'lakefile.lean');
-
-      let fileType: 'toml' | 'lean' | undefined;
-      let lakefile: string;
-      if (fs.existsSync(lakefileToml)) {
-        fileType = 'toml';
-        lakefile = lakefileToml;
-      } else if (fs.existsSync(lakefileLean)) {
-        fileType = 'lean';
-        lakefile = lakefileLean;
-      } else {
-        vscode.window.showErrorMessage('Could not find lakefile.toml or lakefile.lean in project.');
-        return;
-      }
-
-      let content = fs.readFileSync(lakefile, 'utf-8');
-      let modified = false;
-
-      if (fileType === 'toml') {
-        if (!content.includes('external_api')) {
-          content += `\n\n[[require]]\nname = \"external_api\"\ngit = \"https://github.com/wadkisson/external_api\"\nrev = \"main\"\n`;
-          modified = true;
-        }
-      } else if (fileType === 'lean') {
-        if (!content.includes('require external_api')) {
-          content += `\nrequire external_api from git \"https://github.com/wadkisson/external_api\" @ \"main\"\n`;
-          modified = true;
-        }
-      }
-
-      if (modified) {
-        fs.writeFileSync(lakefile, content);
-        vscode.window.showInformationMessage(`✅ ${fileType === 'toml' ? 'lakefile.toml' : 'lakefile.lean'} updated with external_api config.`);
-      } else {
-        vscode.window.showInformationMessage('ℹ️ external_api was already configured.');
-      }
-
-      const run = (cmd: string, label: string) =>
-        new Promise<void>((resolve, reject) => {
-          vscode.window.showInformationMessage(label);
-          exec(cmd, { cwd: projectPath }, (err, stdout, stderr) => {
-            if (err) reject(stderr || stdout);
-            else resolve();
-          });
-        });
-
-      try {
-        panelInstance.updateWebviewDownloading();
-
-        await run('lake update', '📦 Running: lake update...');
-        await run('lake build', '🔧 Building project...');
-
-        vscode.window.showInformationMessage('✅ Models ready to run remotely!');
-        context.workspaceState.update('leanCopilotInstalled', true);
-        vscode.commands.executeCommand('leanCopilotPanel.refresh');
-      } catch (e: any) {
-        vscode.window.showErrorMessage('❌ Setup failed:\n' + e.toString());
-      }
-    })
-  );
 }
 
 class LeanCopilotPanel implements vscode.WebviewViewProvider {
@@ -205,10 +134,6 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
       if (msg.command === 'setup') {
         this.updateWebviewDownloading();
         vscode.commands.executeCommand('leanCopilot.setupToml');
-      }
-      if (msg.command === 'runModelsRemotely') {
-        this.updateWebviewDownloading();
-        vscode.commands.executeCommand('leanCopilot.runModelsRemotely');
       }
     });
 
@@ -290,23 +215,30 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
               background-color: #005fa3;
             }
             .remote-button {
-              background-color: #28a745;
+              background-color: #6c757d;
+              cursor: not-allowed;
+              opacity: 0.6;
             }
             .remote-button:hover {
-              background-color: #218838;
+              background-color: #6c757d;
+            }
+            .disabled-text {
+              font-size: 0.8rem;
+              color: var(--vscode-descriptionForeground);
+              margin-top: 0.5rem;
             }
           </style>
         </head>
         <body>
           <button onclick="setup()">Download LeanCopilot locally</button>
-          <button class="remote-button" onclick="runModelsRemotely()">Run models remotely</button>
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <button class="remote-button" disabled>Run models remotely</button>
+            <div class="disabled-text">temporarily disabled</div>
+          </div>
           <script>
             const vscode = acquireVsCodeApi();
             function setup() {
               vscode.postMessage({ command: 'setup' });
-            }
-            function runModelsRemotely() {
-              vscode.postMessage({ command: 'runModelsRemotely' });
             }
           </script>
         </body>
