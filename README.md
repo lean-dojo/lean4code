@@ -43,18 +43,6 @@ cd lean4code</code></pre>
     - From the main vscode directory (lean4code/vscode):
     <pre><code>npm install</code></pre>
   </li>
-
-  <li>Compile extensions<br />
-    -In both <code>vscode/extensions/lean4dojo-panel</code>, and <code>vscode/extensions/leancopilot-panel</code>, run:
-    <pre><code>npm install
-npm run compile</code></pre>
-  </li>
-
-  <li>Build the Lean4 extension (<code>cd vscode/extensions/lean4</code>)<br />
-    Then run:
-    <pre><code>npm install
-npm run build</code></pre>
-  </li>
 </ol>
 
 <h2>Build commands for different systems</h2>
