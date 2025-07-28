@@ -87,3 +87,10 @@ Building Lean4Code on Windows requires Visual Studio Build Tools for native depe
     </ul>
   </li>
   <li>Apply changes, wait for installation, then restart your computer. From here, you can continue with build instruction #2 as normal.</li>
+</ol>
+
+<h2>⚠️Mac Users⚠️</h2>
+
+<p>
+MacOS GateKeeper automatically puts a quarantine on all apps it doesn't recognize. To remove Lean4Code's quarantine, and start using the app, run this terminal command, where "path" refers to wherever you have Lean4Code stored: "xattr -rd com.apple.quarantine path/Lean4Code.app"
+</p>
