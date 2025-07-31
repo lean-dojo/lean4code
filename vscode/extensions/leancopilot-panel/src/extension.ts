@@ -214,6 +214,13 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
             button:hover {
               background-color: #005fa3;
             }
+            .huggingface-button {
+              background-color: #ffd700;
+              color: #333;
+            }
+            .huggingface-button:hover {
+              background-color: #ffed4e;
+            }
             .remote-button {
               background-color: #6c757d;
               cursor: not-allowed;
@@ -227,9 +234,46 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
               color: var(--vscode-descriptionForeground);
               margin-top: 0.5rem;
             }
+            .separator {
+              width: 100%;
+              text-align: center;
+              margin: 1rem 0;
+              color: var(--vscode-descriptionForeground);
+              font-size: 1.2rem;
+            }
+            .input-box {
+              width: 100%;
+              max-width: 300px;
+              padding: 0.8rem;
+              border: 1px solid var(--vscode-input-border);
+              border-radius: 5px;
+              background: var(--vscode-input-background);
+              color: var(--vscode-input-foreground);
+              font-size: 1rem;
+              margin: 0.5rem 0;
+            }
+            .input-box::placeholder {
+              color: var(--vscode-input-placeholderForeground);
+            }
+            .hyperlink {
+              font-size: 0.7rem;
+              color: var(--vscode-textLink-foreground);
+              text-decoration: underline;
+              cursor: pointer;
+              margin-top: 0.3rem;
+            }
+            .hyperlink:hover {
+              color: var(--vscode-textLink-activeForeground);
+            }
           </style>
         </head>
         <body>
+          <button class="huggingface-button" onclick="runHuggingFace()">Run remotely with HuggingFace (recommended)</button>
+          <input type="text" class="input-box" placeholder="Enter PAT">
+          <div class="hyperlink" onclick="openHuggingFaceDocs()">Get a HF PAT here</div>
+          
+          <div class="separator">---</div>
+          
           <button onclick="setup()">Download LeanCopilot locally</button>
           <div style="display: flex; flex-direction: column; align-items: center;">
             <button class="remote-button" disabled>Run models remotely</button>
@@ -239,6 +283,12 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
             const vscode = acquireVsCodeApi();
             function setup() {
               vscode.postMessage({ command: 'setup' });
+            }
+            function runHuggingFace() {
+              vscode.postMessage({ command: 'runHuggingFace' });
+            }
+            function openHuggingFaceDocs() {
+              vscode.postMessage({ command: 'openHuggingFaceDocs' });
             }
           </script>
         </body>
