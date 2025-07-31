@@ -135,6 +135,16 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
         this.updateWebviewDownloading();
         vscode.commands.executeCommand('leanCopilot.setupToml');
       }
+      if (msg.command === 'runModelsRemotely') {
+        this.updateWebviewDownloading();
+        vscode.commands.executeCommand('leanCopilot.runModelsRemotely');
+      }
+      if (msg.command === 'runHuggingFace') {
+        this.handleHuggingFaceSetup();
+      }
+      if (msg.command === 'openHuggingFaceDocs') {
+        vscode.env.openExternal(vscode.Uri.parse('https://huggingface.co/docs/hub/en/security-tokens'));
+      }
     });
 
     vscode.commands.registerCommand('leanCopilotPanel.refresh', () => {
@@ -155,6 +165,53 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
         </html>
       `;
     }
+  }
+
+  private async handleHuggingFaceSetup() {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+      vscode.window.showErrorMessage('No workspace folder found.');
+      return;
+    }
+
+    // Get the PAT from the webview input field
+    const pat = await this.getPatFromWebview();
+    
+    if (!pat || pat.trim() === '') {
+      vscode.window.showErrorMessage('Please enter a PAT');
+      return;
+    }
+
+    const projectPath = folder.uri.fsPath;
+    const envFilePath = path.join(projectPath, '.env');
+
+    try {
+      // Create .env file with the PAT
+      const envContent = `HF_PAT=${pat}\n`;
+      fs.writeFileSync(envFilePath, envContent);
+      vscode.window.showInformationMessage('✅ PAT saved to .env file');
+    } catch (error) {
+      vscode.window.showErrorMessage(`❌ Failed to save PAT: ${error}`);
+    }
+  }
+
+  private async getPatFromWebview(): Promise<string> {
+    return new Promise((resolve) => {
+      if (this._view) {
+        this._view.webview.postMessage({ command: 'getPat' });
+        
+        const messageHandler = (msg: any) => {
+          if (msg.command === 'patValue') {
+            this._view?.webview.onDidReceiveMessage(messageHandler);
+            resolve(msg.value || '');
+          }
+        };
+        
+        this._view.webview.onDidReceiveMessage(messageHandler);
+      } else {
+        resolve('');
+      }
+    });
   }
 
   private getHtml(installed: boolean): string {
@@ -290,6 +347,16 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
             function openHuggingFaceDocs() {
               vscode.postMessage({ command: 'openHuggingFaceDocs' });
             }
+            
+            // Listen for messages from the extension
+            window.addEventListener('message', event => {
+              const message = event.data;
+              if (message.command === 'getPat') {
+                const patInput = document.querySelector('.input-box');
+                const patValue = patInput ? patInput.value : '';
+                vscode.postMessage({ command: 'patValue', value: patValue });
+              }
+            });
           </script>
         </body>
         </html>
