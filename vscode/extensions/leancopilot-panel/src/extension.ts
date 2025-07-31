@@ -116,6 +116,67 @@ moreLinkArgs = [
       }
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('leanCopilot.runHuggingFaceModels', async () => {
+      const folder = vscode.workspace.workspaceFolders?.[0];
+      if (!folder) {
+        vscode.window.showErrorMessage('No workspace folder found.');
+        return;
+      }
+
+      const projectPath = folder.uri.fsPath;
+      const lakefile = path.join(projectPath, 'lakefile.toml');
+
+      if (!fs.existsSync(lakefile)) {
+        vscode.window.showErrorMessage('Could not find lakefile.toml in project.');
+        return;
+      }
+
+      let content = fs.readFileSync(lakefile, 'utf-8');
+      let modified = false;
+
+      if (!content.includes('external_api')) {
+        content += `
+
+[[require]]
+name = "external_api"
+git = "https://github.com/wadkisson/external_api_hf"
+rev = "main"
+`;
+        modified = true;
+      }
+
+      if (modified) {
+        fs.writeFileSync(lakefile, content);
+        vscode.window.showInformationMessage('✅ lakefile.toml updated with external_api config.');
+      } else {
+        vscode.window.showInformationMessage('ℹ️ external_api was already configured.');
+      }
+
+      const run = (cmd: string, label: string) =>
+        new Promise<void>((resolve, reject) => {
+          vscode.window.showInformationMessage(label);
+          exec(cmd, { cwd: projectPath }, (err, stdout, stderr) => {
+            if (err) reject(stderr || stdout);
+            else resolve();
+          });
+        });
+
+      try {
+        panelInstance.updateWebviewDownloading();
+
+        await run('lake update', '📦 Running: lake update...');
+        await run('lake build', '🔧 Building project...');
+
+        vscode.window.showInformationMessage('✅ Models ready to run with HuggingFace!');
+        context.workspaceState.update('leanCopilotInstalled', true);
+        vscode.commands.executeCommand('leanCopilotPanel.refresh');
+      } catch (e: any) {
+        vscode.window.showErrorMessage('❌ Setup failed:\n' + e.toString());
+      }
+    })
+  );
 }
 
 class LeanCopilotPanel implements vscode.WebviewViewProvider {
@@ -141,6 +202,7 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
       }
       if (msg.command === 'runHuggingFace') {
         this.handleHuggingFaceSetup();
+        vscode.commands.executeCommand('leanCopilot.runHuggingFaceModels');
       }
       if (msg.command === 'openHuggingFaceDocs') {
         vscode.env.openExternal(vscode.Uri.parse('https://huggingface.co/docs/hub/en/security-tokens'));
