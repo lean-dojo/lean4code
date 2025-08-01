@@ -249,7 +249,7 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
 
     try {
       // Create .env file with the PAT
-      const envContent = `HF_PAT=${pat}\n`;
+      const envContent = `HF_TOKEN=${pat}\n`;
       fs.writeFileSync(envFilePath, envContent);
       vscode.window.showInformationMessage('✅ PAT saved to .env file');
     } catch (error) {
