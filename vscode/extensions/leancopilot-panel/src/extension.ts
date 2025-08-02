@@ -334,11 +334,11 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
               background-color: #005fa3;
             }
             .huggingface-button {
-              background-color: #ffd700;
-              color: #333;
+              background-color: #007acc;
+              color: white;
             }
             .huggingface-button:hover {
-              background-color: #ffed4e;
+              background-color: #005fa3;
             }
             .remote-button {
               background-color: #6c757d;
@@ -418,8 +418,7 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
                 const patValue = patInput ? patInput.value : '';
                 vscode.postMessage({ command: 'patValue', value: patValue });
               }
-            });
-          </script>
+            });          </script>
         </body>
         </html>
       `;
