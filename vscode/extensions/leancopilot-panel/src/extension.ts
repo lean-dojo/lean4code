@@ -388,7 +388,7 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
         </head>
         <body>
           <button class="huggingface-button" onclick="runHuggingFace()">Run remotely with HuggingFace (recommended)</button>
-          <input type="text" class="input-box" placeholder="Enter PAT">
+          <input type="password" class="input-box" placeholder="Enter PAT">
           <div class="hyperlink" onclick="openHuggingFaceDocs()">Get a HF PAT here</div>
           
           <div class="separator">---</div>
