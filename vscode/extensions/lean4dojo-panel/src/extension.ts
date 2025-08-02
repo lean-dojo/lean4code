@@ -551,7 +551,7 @@ if __name__ == "__main__":
             width: 100%;
             max-width: 400px;
           }
-          input[type="text"] {
+          input[type="text"], input[type="password"] {
             width: 100%;
             padding: 0.5rem;
             font-size: 0.9rem;
@@ -607,7 +607,7 @@ if __name__ == "__main__":
           <input id="commitInput" type="text" placeholder="e.g., abc1234..." />
           
           <div class="field-label">Personal Access Token</div>
-          <input id="tokenInput" type="text" placeholder="GitHub PAT for unlimited API access" />
+          <input id="tokenInput" type="password" placeholder="GitHub PAT for unlimited API access" />
           
           <div class="field-label">Lean Version</div>
           <input id="leanVersionInput" type="text" placeholder="e.g., leanprover/lean4:v4.21.0-rc3" />
