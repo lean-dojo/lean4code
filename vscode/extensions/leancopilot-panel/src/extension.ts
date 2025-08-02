@@ -322,12 +322,12 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
               gap: 1rem;
             }
             button {
-              font-size: 1.4rem;
-              padding: 1.5rem 3rem;
+              font-size: 0.9rem;
+              padding: 0.5rem 1rem;
               background-color: #007acc;
               color: white;
               border: none;
-              border-radius: 10px;
+              border-radius: 6px;
               cursor: pointer;
             }
             button:hover {
