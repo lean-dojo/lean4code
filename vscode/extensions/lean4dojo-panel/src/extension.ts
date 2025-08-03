@@ -743,6 +743,17 @@ if __name__ == "__main__":
             margin-bottom: 1rem;
             text-align: center;
           }
+          .trace-completion-info {
+            font-size: 0.75rem;
+            color: var(--vscode-descriptionForeground);
+            text-align: center;
+            margin-top: 0.5rem;
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            background: var(--vscode-input-background);
+            border-radius: 4px;
+            border: 1px solid var(--vscode-input-border);
+          }
           .trace-info {
             font-size: 0.75rem;
             color: var(--vscode-descriptionForeground);
@@ -764,6 +775,9 @@ if __name__ == "__main__":
         ${traceAlreadyCompleted ? '✅ Trace completed' : '🔧 Click here to trace your repo!'}
       </button>
 
+      <div class="trace-completion-info">
+        Tracing is complete when "out" folder is populated, this may take a few seconds to a few hours...
+      </div>
 
           
           <div class="trace-info">
