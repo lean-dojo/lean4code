@@ -754,17 +754,6 @@ if __name__ == "__main__":
             border-radius: 4px;
             border: 1px solid var(--vscode-input-border);
           }
-          .trace-info {
-            font-size: 0.75rem;
-            color: var(--vscode-descriptionForeground);
-            text-align: center;
-            margin-top: 1rem;
-            padding: 0.5rem;
-            background: var(--vscode-input-background);
-            border-radius: 4px;
-            border: 1px solid var(--vscode-input-border);
-            display: ${this.tracingInProgress ? 'block' : 'none'};
-          }
         </style>
       </head>
       <body>
@@ -779,11 +768,7 @@ if __name__ == "__main__":
         Tracing is complete when "out" folder is populated, this may take a few seconds to a few hours...
       </div>
 
-          
-          <div class="trace-info">
-            Tracing is completed when your project's "out" folder is populated; this may take hours
-          </div>
-        </div>
+        
         
         <script>
           const vscode = acquireVsCodeApi();
