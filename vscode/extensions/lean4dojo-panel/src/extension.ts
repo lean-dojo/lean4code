@@ -198,7 +198,6 @@ import os
 import json
 from pathlib import Path
 import sys
-from lean_dojo import LeanGitRepo, trace
 
 
 # Set GitHub token for unlimited API access
