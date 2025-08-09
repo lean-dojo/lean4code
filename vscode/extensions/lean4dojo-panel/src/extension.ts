@@ -160,8 +160,8 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       const traceScript = this.generateTraceScript( repoUrl, commitHash, token.trim(), leanVersion.trim(), cachePath, tmpPath);
       fs.writeFileSync(path.join(tracePath, 'trace_repo.py'), traceScript);
 
-       // Clone LeanLibrary into the trace subdirectory
-       exec('git clone https://github.com/lean-dojo/LeanLibrary', { cwd: tracePath }, () => { /* ignore result */ });
+       // Clone LeanLibrary into the trace subdirectory (run exactly as requested)
+       exec(`git clone https://github.com/lean-dojo/LeanLibrary`, { cwd: tracePath }, () => { /* ignore result */ });
 
       // Clone repo
       exec(`git clone "${repoUrl}" .`, { cwd: repoPath }, (error) => {
@@ -197,7 +197,7 @@ import os
 import json
 from pathlib import Path
 import sys
-from lean_dojo import trace, LeanGitRepo
+
 
 # Set GitHub token for unlimited API access
 os.environ['GITHUB_ACCESS_TOKEN'] = '${token}'
@@ -222,7 +222,6 @@ def write_status(message, status="info"):
 def main():
     write_status(f"✅ Using Python: {sys.executable}")
     write_status(f"✅ Using Lean version: ${leanVersion}")
-   
 
     repo_path = "../repo"
     write_status(f"Using repo folder: {repo_path}")
@@ -236,7 +235,7 @@ def main():
 
     write_status("Starting LeanDojo trace...")
     from lean_dojo import LeanGitRepo
-    from lean_dojo.data_extraction.trace import traces
+    from lean_dojo.data_extraction.trace import trace
 
     # Compute out directory path
     out_dir = os.path.abspath("../out")
@@ -298,7 +297,6 @@ if __name__ == "__main__":
     }
   }
 
-  
 
   private async handleInstallLean(): Promise<void> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
