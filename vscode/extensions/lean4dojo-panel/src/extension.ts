@@ -161,12 +161,6 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       const traceScript = this.generateTraceScript( repoUrl, commitHash, token.trim(), leanVersion.trim(), cachePath, tmpPath);
       fs.writeFileSync(path.join(tracePath, 'trace.py'), traceScript);
 
-      // Clone mathlib4 into the trace folder (non-blocking, best-effort)
-      exec(`git clone "https://github.com/lean-dojo/LeanLibrary"`, { cwd: tracePath }, (mlError) => {
-        if (mlError) {
-          vscode.window.showWarningMessage(`Failed to clone LeanLibrary into trace folder: ${mlError.message}`);
-        }
-      });
 
       // Clone repo
       exec(`git clone "${repoUrl}" .`, { cwd: repoPath }, (error) => {
@@ -322,6 +316,18 @@ if __name__ == "__main__":
       }
       
       const pythonCmd = pythonCommands[currentIndex];
+      exec(`${pythonCmd} -m pip install lean-dojo`, { cwd: tracePath }, (error) => {
+        if (error) {
+          currentIndex++;
+          tryNextCommand();
+          return;
+        }
+        
+        this.leanDojoInstalled = true;
+        vscode.window.showInformationMessage(`✅ LeanDojo installed successfully using ${pythonCmd}`);
+        setTimeout(() => this.updatePanel(), 1000);
+      });
+
     };
     
     vscode.window.showInformationMessage('Installing LeanDojo...');
