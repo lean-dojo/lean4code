@@ -33,7 +33,6 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       switch (msg.command) {
         case 'createProject': this.handleCreateProject(msg.repoUrl, msg.commitHash, msg.projectName, msg.token, msg.leanVersion); break;
         case 'installPython': this.handleInstallPython(); break;
-        case 'installLeanDojo': this.handleInstallLeanDojo(); break;
         case 'installLean': this.handleInstallLean(); break;
         case 'runTrace': this.handleRunTrace(); break;
         case 'cleanupOut': this.handleCleanupOut(); break;
@@ -201,7 +200,7 @@ import sys
 
 
 # Set GitHub token for unlimited API access
-os.environ['GITHUB_TOKEN'] = '${token}'
+os.environ['GITHUB_ACCESS_TOKEN'] = '${token}'
 os.environ['CACHE_DIR'] = os.path.abspath('${cacheDir}')
 os.environ['TMP_DIR'] = os.path.abspath('${tmpDir}')
 
@@ -298,10 +297,6 @@ if __name__ == "__main__":
     }
   }
 
-  private async handleInstallLeanDojo(): Promise<void> {
-    vscode.window.showInformationMessage('Skipping LeanDojo installation. Please ensure the Python package "lean-dojo" is installed manually.');
-    this.updatePanel();
-  }
 
   private async handleInstallLean(): Promise<void> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -456,7 +451,6 @@ if __name__ == "__main__":
   private async oneClickTrace(){
     vscode.window.showInformationMessage('Running trace...');
     await this.handleInstallPython();
-    await this.handleInstallLeanDojo();
     await this.handleInstallLean();
     await this.handleRunTrace();
   }
