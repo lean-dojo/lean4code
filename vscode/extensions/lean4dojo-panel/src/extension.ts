@@ -60,10 +60,10 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     console.log('buildDeps toggled to:', this.buildDeps);
     vscode.window.showInformationMessage(`Build deps: ${this.buildDeps ? 'ON' : 'OFF'}`);
     
-    // Update the trace.py file with the new buildDeps setting
+    // Update the trace_repo.py file with the new buildDeps setting
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (root) {
-      const traceScriptPath = path.join(root, 'trace', 'trace.py');
+      const traceScriptPath = path.join(root, 'trace', 'trace_repo.py');
       if (fs.existsSync(traceScriptPath)) {
         try {
           const traceScript = fs.readFileSync(traceScriptPath, 'utf8');
@@ -72,9 +72,9 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
             `build_deps = ${this.buildDeps ? 'True' : 'False'}`
           );
           fs.writeFileSync(traceScriptPath, updatedScript);
-          console.log('Updated trace.py with build_deps =', this.buildDeps);
+          console.log('Updated trace_repo.py with build_deps =', this.buildDeps);
         } catch (error) {
-          console.error('Failed to update trace.py:', error);
+          console.error('Failed to update trace_repo.py:', error);
         }
       }
     }
@@ -90,7 +90,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
   private isLeanProject(): boolean {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-    return fs.existsSync(path.join(root, 'trace', 'trace.py'));
+    return fs.existsSync(path.join(root, 'trace', 'trace_repo.py'));
   }
 
   private isValidUrl(url: string): boolean {
@@ -159,7 +159,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
       // Create trace script
       const traceScript = this.generateTraceScript( repoUrl, commitHash, token.trim(), leanVersion.trim(), cachePath, tmpPath);
-      fs.writeFileSync(path.join(tracePath, 'trace.py'), traceScript);
+      fs.writeFileSync(path.join(tracePath, 'trace_repo.py'), traceScript);
 
        // Clone LeanLibrary into the trace subdirectory (run exactly as requested)
        exec(`git clone https://github.com/lean-dojo/LeanLibrary`, { cwd: tracePath }, () => { /* ignore result */ });
@@ -198,6 +198,7 @@ import os
 import json
 from pathlib import Path
 import sys
+from lean_dojo import LeanGitRepo, trace
 
 
 # Set GitHub token for unlimited API access
@@ -221,10 +222,8 @@ def write_status(message, status="info"):
     print(f"[{status.upper()}] {message}", flush=True)
 
 def main():
-    write_status("🚀 Upgrading lean-dojo via pip...")
     write_status(f"✅ Using Python: {sys.executable}")
     write_status(f"✅ Using Lean version: ${leanVersion}")
-    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "lean-dojo"], check=True)
 
     repo_path = "../repo"
     write_status(f"Using repo folder: {repo_path}")
@@ -301,39 +300,8 @@ if __name__ == "__main__":
   }
 
   private async handleInstallLeanDojo(): Promise<void> {
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) {
-      vscode.window.showErrorMessage('No workspace folder open');
-      return;
-    }
-
-    const tracePath = path.join(root, 'trace');
-    const pythonCommands = ['python3.10', 'python3', 'python'];
-    
-    let currentIndex = 0;
-    
-    const tryNextCommand = () => {
-      if (currentIndex >= pythonCommands.length) {
-        vscode.window.showErrorMessage('No Python installation found. Please install Python first.');
-        return;
-      }
-      
-      const pythonCmd = pythonCommands[currentIndex];
-      exec(`${pythonCmd} -m pip install lean-dojo`, { cwd: tracePath }, (error) => {
-        if (error) {
-          currentIndex++;
-          tryNextCommand();
-          return;
-        }
-        
-        this.leanDojoInstalled = true;
-        vscode.window.showInformationMessage(`✅ LeanDojo installed successfully using ${pythonCmd}`);
-        setTimeout(() => this.updatePanel(), 1000);
-      });
-    };
-    
-    vscode.window.showInformationMessage('Installing LeanDojo...');
-    tryNextCommand();
+    vscode.window.showInformationMessage('Skipping LeanDojo installation. Please ensure the Python package "lean-dojo" is installed manually.');
+    this.updatePanel();
   }
 
   private async handleInstallLean(): Promise<void> {
@@ -346,10 +314,10 @@ if __name__ == "__main__":
     const repoPath = path.join(root, 'repo');
     const tracePath = path.join(root, 'trace');
     
-    // Read the Lean version from the trace.py file
-    const traceScriptPath = path.join(tracePath, 'trace.py');
+    // Read the Lean version from the trace_repo.py file
+    const traceScriptPath = path.join(tracePath, 'trace_repo.py');
     if (!fs.existsSync(traceScriptPath)) {
-      vscode.window.showErrorMessage('trace.py not found. Please create a project first.');
+      vscode.window.showErrorMessage('trace_repo.py not found. Please create a project first.');
       return;
     }
 
@@ -357,7 +325,7 @@ if __name__ == "__main__":
       const traceScript = fs.readFileSync(traceScriptPath, 'utf8');
       const leanVersionMatch = traceScript.match(/lean_version = "([^"]+)"/);
       if (!leanVersionMatch) {
-        vscode.window.showErrorMessage('Could not find Lean version in trace.py');
+        vscode.window.showErrorMessage('Could not find Lean version in trace_repo.py');
         return;
       }
       
@@ -381,7 +349,7 @@ if __name__ == "__main__":
       });
 
     } catch (error: any) {
-      vscode.window.showErrorMessage(`Failed to read trace.py: ${error.message}`);
+      vscode.window.showErrorMessage(`Failed to read trace_repo.py: ${error.message}`);
     }
   }
 
@@ -417,10 +385,10 @@ if __name__ == "__main__":
     }
 
     const tracePath = path.join(root, 'trace');
-    const traceScriptPath = path.join(tracePath, 'trace.py');
+    const traceScriptPath = path.join(tracePath, 'trace_repo.py');
 
     if (!fs.existsSync(traceScriptPath)) {
-      vscode.window.showErrorMessage('trace.py not found');
+      vscode.window.showErrorMessage('trace_repo.py not found');
       return;
     }
 
@@ -685,10 +653,10 @@ if __name__ == "__main__":
     const traceDoneFlagPath = path.join(root, 'out', 'trace_done.flag');
     const traceAlreadyCompleted = fs.existsSync(traceDoneFlagPath);
     
-    // Extract Lean version from trace.py
+    // Extract Lean version from trace_repo.py
     let leanVersion = '';
     try {
-      const traceScriptPath = path.join(root, 'trace', 'trace.py');
+      const traceScriptPath = path.join(root, 'trace', 'trace_repo.py');
       if (fs.existsSync(traceScriptPath)) {
         const traceScript = fs.readFileSync(traceScriptPath, 'utf8');
         const match = traceScript.match(/lean_version = "([^"]+)"/);
