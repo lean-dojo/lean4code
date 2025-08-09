@@ -197,7 +197,7 @@ from pathlib import Path
 import sys
 
 # Set GitHub token for unlimited API access
-os.environ['GITHUB_TOKEN'] = '${token}'
+os.environ['GITHUB_ACCESS_TOKEN'] = '${token}'
 os.environ['CACHE_DIR'] = os.path.abspath('${cacheDir}')
 os.environ['TMP_DIR'] = os.path.abspath('${tmpDir}')
 
@@ -234,7 +234,7 @@ def main():
 
     write_status("Starting LeanDojo trace...")
     from lean_dojo import LeanGitRepo
-    from lean_dojo.data_extraction.trace import trace
+    from lean_dojo.data_extraction.trace import traces
 
     # Compute out directory path
     out_dir = os.path.abspath("../out")
