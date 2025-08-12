@@ -1,0 +1,15 @@
+<svg width="24" height="24" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="tOutlineTitle">
+  <title id="tOutlineTitle">Centered Outlined Capital T</title>
+  <text x="50%" y="50%"
+        font-family="Arial Black, sans-serif"
+        font-size="180"
+        font-weight="900"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="10"
+        text-anchor="middle"
+        dominant-baseline="middle">
+    T
+  </text>
+</svg>
+
