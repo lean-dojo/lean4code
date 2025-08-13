@@ -16,6 +16,7 @@ class TarsPanel implements vscode.WebviewViewProvider {
   private tarsBooted = false;
   private bootMode = '';
   private talkWithTarsClicked = false;
+  private tarsTerminal?: vscode.Terminal;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -36,6 +37,9 @@ class TarsPanel implements vscode.WebviewViewProvider {
       }
       if (msg.command === 'talkWithTars') {
         this.handleTalkWithTars();
+      }
+      if (msg.command === 'sendTarsMessage') {
+        this.handleSendTarsMessage(msg.text);
       }
     });
   }
@@ -113,8 +117,8 @@ class TarsPanel implements vscode.WebviewViewProvider {
     try {
       vscode.window.showInformationMessage('Opening TARS chat terminal...');
       
-      const terminal = vscode.window.createTerminal('TARS Chat');
-      terminal.show();
+      this.tarsTerminal = vscode.window.createTerminal('TARS Chat');
+      this.tarsTerminal.show();
       
       this.talkWithTarsClicked = true;
       vscode.window.showInformationMessage('✅ TARS chat terminal opened');
@@ -122,6 +126,28 @@ class TarsPanel implements vscode.WebviewViewProvider {
       
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to open TARS chat: ${error.message}`);
+    }
+  }
+
+  private async handleSendTarsMessage(text: string): Promise<void> {
+    if (!text?.trim()) {
+      return;
+    }
+
+    try {
+      if (this.tarsTerminal) {
+        this.tarsTerminal.show();
+        
+        const curlCommand = `curl -X POST http://localhost:8888/api/v1/oneshot/query \\\n  -H "Content-Type: application/json" \\\n  -d '{"query": "${text}"}'`;
+        this.tarsTerminal.sendText(curlCommand);
+        
+        vscode.window.showInformationMessage('✅ Message sent to TARS');
+      } else {
+        vscode.window.showErrorMessage('TARS terminal not available');
+      }
+      
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to send message: ${error.message}`);
     }
   }
 
@@ -204,6 +230,7 @@ class TarsPanel implements vscode.WebviewViewProvider {
           ${this.tarsBooted && !this.talkWithTarsClicked ? '<button onclick="talkWithTars()" class="blue">💬 Talk with Tars</button>' : ''}
           ${this.talkWithTarsClicked ? '<div class="checkmark">✅</div>' : ''}
           ${this.talkWithTarsClicked ? '<input id="talkWithTarsInput" type="text" placeholder="Talk with Tars" />' : ''}
+          ${this.talkWithTarsClicked ? '<button onclick="sendTarsMessage()" class="blue">📤 Send Message</button>' : ''}
         </div>
         
         <script>
@@ -224,6 +251,14 @@ class TarsPanel implements vscode.WebviewViewProvider {
           
           function talkWithTars() {
             vscode.postMessage({ command: 'talkWithTars' });
+          }
+          
+          function sendTarsMessage() {
+            const text = document.getElementById('talkWithTarsInput').value;
+            if (text.trim()) {
+              vscode.postMessage({ command: 'sendTarsMessage', text: text });
+              document.getElementById('talkWithTarsInput').value = '';
+            }
           }
           
           // Allow Enter key to submit the OpenAI key
