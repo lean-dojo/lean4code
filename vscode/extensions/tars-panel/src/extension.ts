@@ -120,8 +120,11 @@ class TarsPanel implements vscode.WebviewViewProvider {
       this.tarsTerminal = vscode.window.createTerminal('TARS Chat');
       this.tarsTerminal.show();
       
+      const createSessionCommand = `curl -X POST http://localhost:8888/api/v1/sessions/create \\\n  -H "Content-Type: application/json"`;
+      this.tarsTerminal.sendText(createSessionCommand);
+      
       this.talkWithTarsClicked = true;
-      vscode.window.showInformationMessage('✅ TARS chat terminal opened');
+      vscode.window.showInformationMessage('✅ TARS chat terminal opened and session created');
       this.updatePanel();
       
     } catch (error: any) {
