@@ -85,6 +85,7 @@ class TarsPanel implements vscode.WebviewViewProvider {
     this.tarsBooted = true;
     this.bootMode = 'chat';
     vscode.window.showInformationMessage('✅ TARS (chat-only) starting on :8888');
+    this.updatePanel();
   }
   
 
@@ -103,6 +104,7 @@ class TarsPanel implements vscode.WebviewViewProvider {
     this.tarsBooted = true;
     this.bootMode = 'agentic';
     vscode.window.showInformationMessage('✅ TARS (agentic) starting on :8888');
+    this.updatePanel();
   }
   
 
@@ -194,8 +196,8 @@ class TarsPanel implements vscode.WebviewViewProvider {
       <body>
         <div class="container">
           ${this.keyEntered ? '<div class="checkmark">✅</div>' : '<input id="openaiKeyInput" type="text" placeholder="Enter OpenAI token here" />'}
-          ${this.tarsBooted ? '<div class="checkmark">✅</div>' : '<button onclick="bootTarsChat()" class="blue" ' + (!this.keyEntered ? 'disabled' : '') + '>🚀 Boot Tars (chat only)</button>'}
-          ${this.tarsBooted ? '' : '<button onclick="bootTarsAgentic()" class="blue" ' + (!this.keyEntered ? 'disabled' : '') + '>🤖 Boot Tars (agentic)</button>'}
+          ${this.tarsBooted && this.bootMode === 'chat' ? '<div class="checkmark">✅</div>' : this.tarsBooted && this.bootMode === 'agentic' ? '<div class="checkmark"></div>' : '<button onclick="bootTarsChat()" class="blue" ' + (!this.keyEntered ? 'disabled' : '') + '>🚀 Boot Tars (chat only)</button>'}
+          ${this.tarsBooted && this.bootMode === 'agentic' ? '<div class="checkmark">✅</div>' : this.tarsBooted && this.bootMode === 'chat' ? '<div class="checkmark"></div>' : '<button onclick="bootTarsAgentic()" class="blue" ' + (!this.keyEntered ? 'disabled' : '') + '>🤖 Boot Tars (agentic)</button>'}
           ${this.tarsBooted ? '<button onclick="talkWithTars()" class="blue">💬 Talk with Tars</button>' : ''}
         </div>
         
