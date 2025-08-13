@@ -18,6 +18,8 @@ class TarsPanel implements vscode.WebviewViewProvider {
   private talkWithTarsClicked = false;
   private tarsTerminal?: vscode.Terminal;
   private currentSessionId?: string;
+  private tarsOutput?: vscode.OutputChannel;
+
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -112,6 +114,21 @@ class TarsPanel implements vscode.WebviewViewProvider {
     vscode.window.showInformationMessage('✅ TARS (agentic) starting on :8888');
     this.updatePanel();
   }
+  private async ensureSession(): Promise<void> {
+    if (this.currentSessionId) return;
+  
+    const res = await fetch('http://localhost:8888/api/v1/sessions/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Failed to create session (HTTP ${res.status}): ${body}`);
+    }
+    const json: any = await res.json();
+    this.currentSessionId = json.sessionId;
+  }
+  
   
 
   private extractSessionId(output: string): string | null {
@@ -127,57 +144,56 @@ class TarsPanel implements vscode.WebviewViewProvider {
 
   private async handleTalkWithTars(): Promise<void> {
     try {
-      vscode.window.showInformationMessage('Opening TARS chat terminal...');
-      
-      this.tarsTerminal = vscode.window.createTerminal('TARS Chat');
-      this.tarsTerminal.show();
-      
-      const createSessionCommand = `curl -X POST http://localhost:8888/api/v1/sessions/create \\\n  -H "Content-Type: application/json"`;
-      this.tarsTerminal.sendText(createSessionCommand);
-      
-      // Execute command and get output
-      const { exec } = require('child_process');
-      const { promisify } = require('util');
-      const execAsync = promisify(exec);
-      
-      const { stdout } = await execAsync(createSessionCommand);
-      const sessionId = this.extractSessionId(stdout);
-      
-      if (sessionId) {
-        this.currentSessionId = sessionId;
-        vscode.window.showInformationMessage(`✅ Session ID: ${sessionId}`);
-      }
-      
+      await this.ensureSession();
+  
       this.talkWithTarsClicked = true;
-      vscode.window.showInformationMessage('✅ TARS chat terminal opened and session created');
+      vscode.window.showInformationMessage(`✅ TARS chat ready (session ${this.currentSessionId})`);
       this.updatePanel();
-      
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to open TARS chat: ${error.message}`);
     }
   }
+  
 
   private async handleSendTarsMessage(text: string): Promise<void> {
-    if (!text?.trim()) {
-      return;
-    }
-
+    const query = text?.trim();
+    if (!query) return;
+  
     try {
-      if (this.tarsTerminal) {
-        this.tarsTerminal.show();
-        
-        const curlCommand = `curl -X POST http://localhost:8888/api/v1/oneshot/query \\\n  -H "Content-Type: application/json" \\\n  -d '{"query": "${text}"}'`;
-        this.tarsTerminal.sendText(curlCommand);
-        
-        vscode.window.showInformationMessage('✅ Message sent to TARS');
-      } else {
-        vscode.window.showErrorMessage('TARS terminal not available');
+      // optional: health check
+      const health = await fetch('http://localhost:8888/api/v1/health');
+      if (!health.ok) throw new Error('TARS server not healthy (start it first)');
+  
+      // ensure session exists once
+      await this.ensureSession();
+  
+      // send into the session (stateful)
+      const res = await fetch('http://localhost:8888/api/v1/sessions/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: this.currentSessionId, query }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`HTTP ${res.status}: ${body}`);
       }
-      
+  
+      const json: any = await res.json();
+      const content = (json?.result?.content ?? '').replace(/\s+/g, ' ').trim();
+  
+      if (!this.tarsOutput) this.tarsOutput = vscode.window.createOutputChannel('TARS');
+      // keep transcript
+      this.tarsOutput.appendLine(`> ${query}`);
+      this.tarsOutput.appendLine(content || '[no content]');
+      this.tarsOutput.appendLine('');
+      this.tarsOutput.show(true);
+  
+      vscode.window.showInformationMessage('✅ Message sent to TARS (session)');
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to send message: ${error.message}`);
     }
   }
+  
 
   private getHtml(): string {
     return `
