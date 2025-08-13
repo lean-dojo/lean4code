@@ -17,6 +17,7 @@ class TarsPanel implements vscode.WebviewViewProvider {
   private bootMode = '';
   private talkWithTarsClicked = false;
   private tarsTerminal?: vscode.Terminal;
+  private currentSessionId?: string;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -113,6 +114,17 @@ class TarsPanel implements vscode.WebviewViewProvider {
   }
   
 
+  private extractSessionId(output: string): string | null {
+    const sessionIdIndex = output.indexOf('sessionId');
+    if (sessionIdIndex === -1) return null;
+    
+    const startIndex = sessionIdIndex + 11;
+    const endIndex = output.indexOf('"', startIndex);
+    
+    if (endIndex === -1) return null;
+    return output.substring(startIndex, endIndex);
+  }
+
   private async handleTalkWithTars(): Promise<void> {
     try {
       vscode.window.showInformationMessage('Opening TARS chat terminal...');
@@ -122,6 +134,19 @@ class TarsPanel implements vscode.WebviewViewProvider {
       
       const createSessionCommand = `curl -X POST http://localhost:8888/api/v1/sessions/create \\\n  -H "Content-Type: application/json"`;
       this.tarsTerminal.sendText(createSessionCommand);
+      
+      // Execute command and get output
+      const { exec } = require('child_process');
+      const { promisify } = require('util');
+      const execAsync = promisify(exec);
+      
+      const { stdout } = await execAsync(createSessionCommand);
+      const sessionId = this.extractSessionId(stdout);
+      
+      if (sessionId) {
+        this.currentSessionId = sessionId;
+        vscode.window.showInformationMessage(`✅ Session ID: ${sessionId}`);
+      }
       
       this.talkWithTarsClicked = true;
       vscode.window.showInformationMessage('✅ TARS chat terminal opened and session created');
