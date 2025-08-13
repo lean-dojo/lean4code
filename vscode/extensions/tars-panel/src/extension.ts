@@ -12,6 +12,7 @@ export function activate(context: vscode.ExtensionContext) {
 class TarsPanel implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private keyEntered = false;
+  private openaiKey = '';
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -23,6 +24,9 @@ class TarsPanel implements vscode.WebviewViewProvider {
     view.webview.onDidReceiveMessage(msg => {
       if (msg.command === 'setOpenAIKey') {
         this.handleSetOpenAIKey(msg.key);
+      }
+      if (msg.command === 'bootTarsInstance') {
+        this.handleBootTarsInstance();
       }
     });
   }
@@ -48,12 +52,37 @@ class TarsPanel implements vscode.WebviewViewProvider {
       terminal.show();
       terminal.sendText(exportCommand);
       
+      this.openaiKey = key;
       this.keyEntered = true;
       vscode.window.showInformationMessage('✅ OpenAI API key set successfully');
       this.updatePanel();
       
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to set OpenAI key: ${error.message}`);
+    }
+  }
+
+  private async handleBootTarsInstance(): Promise<void> {
+    if (!this.openaiKey.trim()) {
+      vscode.window.showErrorMessage('Please enter an OpenAI API key first');
+      return;
+    }
+
+    try {
+      vscode.window.showInformationMessage('Booting TARS instance...');
+      
+      const terminal = vscode.window.createTerminal('TARS Boot');
+      terminal.show();
+      
+      terminal.sendText('nvm install --lts');
+      terminal.sendText('nvm use --lts');
+      terminal.sendText('npm install @agent-tars/cli@latest -g');
+      terminal.sendText(`agent-tars serve --provider openai --model gpt-4o --apiKey ${this.openaiKey}`);
+      
+      vscode.window.showInformationMessage('✅ TARS instance boot commands sent to terminal');
+      
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to boot TARS instance: ${error.message}`);
     }
   }
 
@@ -100,11 +129,40 @@ class TarsPanel implements vscode.WebviewViewProvider {
             text-align: center;
             margin-top: 0.5rem;
           }
+          button {
+            width: 100%;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 1rem;
+          }
+          button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+          }
+          button:disabled {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            cursor: not-allowed;
+          }
+          button.blue {
+            background-color: #007acc;
+            color: white;
+          }
+          button.blue:hover {
+            background-color: #005a9e;
+          }
         </style>
       </head>
       <body>
         <div class="container">
           ${this.keyEntered ? '<div class="checkmark">✅</div>' : '<input id="openaiKeyInput" type="text" placeholder="Enter OpenAI token here" />'}
+          <button onclick="bootTarsInstance()" class="blue" ${!this.keyEntered ? 'disabled' : ''}>
+            🚀 Boot Tars Instance
+          </button>
         </div>
         
         <script>
@@ -113,6 +171,10 @@ class TarsPanel implements vscode.WebviewViewProvider {
           function setOpenAIKey() {
             const key = document.getElementById('openaiKeyInput').value;
             vscode.postMessage({ command: 'setOpenAIKey', key: key });
+          }
+          
+          function bootTarsInstance() {
+            vscode.postMessage({ command: 'bootTarsInstance' });
           }
           
           // Allow Enter key to submit the OpenAI key
