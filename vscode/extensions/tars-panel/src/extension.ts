@@ -15,6 +15,7 @@ class TarsPanel implements vscode.WebviewViewProvider {
   private openaiKey = '';
   private tarsBooted = false;
   private bootMode = '';
+  private talkWithTarsClicked = false;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -115,7 +116,9 @@ class TarsPanel implements vscode.WebviewViewProvider {
       const terminal = vscode.window.createTerminal('TARS Chat');
       terminal.show();
       
+      this.talkWithTarsClicked = true;
       vscode.window.showInformationMessage('✅ TARS chat terminal opened');
+      this.updatePanel();
       
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to open TARS chat: ${error.message}`);
@@ -198,7 +201,9 @@ class TarsPanel implements vscode.WebviewViewProvider {
           ${this.keyEntered ? '<div class="checkmark">✅</div>' : '<input id="openaiKeyInput" type="text" placeholder="Enter OpenAI token here" />'}
           ${this.tarsBooted && this.bootMode === 'chat' ? '<div class="checkmark">✅</div>' : this.tarsBooted && this.bootMode === 'agentic' ? '<div class="checkmark"></div>' : '<button onclick="bootTarsChat()" class="blue" ' + (!this.keyEntered ? 'disabled' : '') + '>🚀 Boot Tars (chat only)</button>'}
           ${this.tarsBooted && this.bootMode === 'agentic' ? '<div class="checkmark">✅</div>' : this.tarsBooted && this.bootMode === 'chat' ? '<div class="checkmark"></div>' : '<button onclick="bootTarsAgentic()" class="blue" ' + (!this.keyEntered ? 'disabled' : '') + '>🤖 Boot Tars (agentic)</button>'}
-          ${this.tarsBooted ? '<button onclick="talkWithTars()" class="blue">💬 Talk with Tars</button>' : ''}
+          ${this.tarsBooted && !this.talkWithTarsClicked ? '<button onclick="talkWithTars()" class="blue">💬 Talk with Tars</button>' : ''}
+          ${this.talkWithTarsClicked ? '<div class="checkmark">✅</div>' : ''}
+          ${this.talkWithTarsClicked ? '<input id="talkWithTarsInput" type="text" placeholder="Talk with Tars" />' : ''}
         </div>
         
         <script>
