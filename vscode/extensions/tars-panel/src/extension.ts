@@ -13,6 +13,7 @@ class TarsPanel implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private keyEntered = false;
   private openaiKey = '';
+  private tarsBooted = false;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -27,6 +28,9 @@ class TarsPanel implements vscode.WebviewViewProvider {
       }
       if (msg.command === 'bootTarsInstance') {
         this.handleBootTarsInstance();
+      }
+      if (msg.command === 'talkWithTars') {
+        this.handleTalkWithTars();
       }
     });
   }
@@ -79,10 +83,26 @@ class TarsPanel implements vscode.WebviewViewProvider {
       terminal.sendText('npm install @agent-tars/cli@latest -g');
       terminal.sendText(`agent-tars serve --provider openai --model gpt-4o --apiKey ${this.openaiKey}`);
       
+      this.tarsBooted = true;
       vscode.window.showInformationMessage('✅ TARS instance boot commands sent to terminal');
+      this.updatePanel();
       
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to boot TARS instance: ${error.message}`);
+    }
+  }
+
+  private async handleTalkWithTars(): Promise<void> {
+    try {
+      vscode.window.showInformationMessage('Opening TARS chat terminal...');
+      
+      const terminal = vscode.window.createTerminal('TARS Chat');
+      terminal.show();
+      
+      vscode.window.showInformationMessage('✅ TARS chat terminal opened');
+      
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to open TARS chat: ${error.message}`);
     }
   }
 
@@ -160,9 +180,8 @@ class TarsPanel implements vscode.WebviewViewProvider {
       <body>
         <div class="container">
           ${this.keyEntered ? '<div class="checkmark">✅</div>' : '<input id="openaiKeyInput" type="text" placeholder="Enter OpenAI token here" />'}
-          <button onclick="bootTarsInstance()" class="blue" ${!this.keyEntered ? 'disabled' : ''}>
-            🚀 Boot Tars Instance
-          </button>
+          ${this.tarsBooted ? '<div class="checkmark">✅</div>' : '<button onclick="bootTarsInstance()" class="blue" ' + (!this.keyEntered ? 'disabled' : '') + '>🚀 Boot Tars Instance</button>'}
+          ${this.tarsBooted ? '<button onclick="talkWithTars()" class="blue">💬 Talk with Tars</button>' : ''}
         </div>
         
         <script>
@@ -175,6 +194,10 @@ class TarsPanel implements vscode.WebviewViewProvider {
           
           function bootTarsInstance() {
             vscode.postMessage({ command: 'bootTarsInstance' });
+          }
+          
+          function talkWithTars() {
+            vscode.postMessage({ command: 'talkWithTars' });
           }
           
           // Allow Enter key to submit the OpenAI key
