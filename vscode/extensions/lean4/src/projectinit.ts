@@ -229,7 +229,31 @@ export class ProjectInitializationProvider implements Disposable {
             return 'DidNotComplete'
         }
 
+        await this.cloneLeanLibrary(projectFolder)
+
         return projectFolder
+    }
+
+    private async cloneLeanLibrary(projectFolder: FileUri): Promise<void> {
+        try {
+            const leanLibraryPath = projectFolder.join('LeanLibrary')
+            this.channel.appendLine(`Cloning LeanLibrary repository to ${leanLibraryPath.fsPath}...`)
+            
+            const result = await batchExecute(
+                'git',
+                ['clone', 'https://github.com/lean-dojo/LeanLibrary', leanLibraryPath.fsPath],
+                projectFolder.fsPath,
+                { combined: this.channel }
+            )
+            
+            if (result.exitCode === ExecutionExitCode.Success) {
+                this.channel.appendLine('Successfully cloned LeanLibrary repository.')
+            } else {
+                this.channel.appendLine('Warning: Failed to clone LeanLibrary repository.')
+            }
+        } catch (error) {
+            this.channel.appendLine(`Warning: Error cloning LeanLibrary repository: ${error}`)
+        }
     }
 
     private async createInitialCommit(projectFolder: FileUri): Promise<'Success' | 'GitAddFailed' | 'GitCommitFailed'> {
