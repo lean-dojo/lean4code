@@ -138,7 +138,7 @@
     "@types/sinon": "^10.0.2",
     "@types/sinon-test": "^2.4.2",
     "@types/trusted-types": "^1.0.6",
-    "@types/vscode": "^1.102.0",
+    "@types/vscode": "^1.103.0",
     "@types/vscode-notebook-renderer": "^1.72.0",
     "@types/webpack": "^5.28.5",
     "@types/wicg-file-system-access": "^2020.9.6",
