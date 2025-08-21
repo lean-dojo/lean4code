@@ -114,13 +114,16 @@ export class GettingStartedPage extends EditorPane {
     addParagraph('To create a new Lean project, click the ∀ symbol on the top right of this page, or hold down Control + Shift + P (Cmd + Shift + P for Mac OS), to create a new Lean project template');
   
     wrapper.appendChild(document.createElement('h2')).textContent = '✨ Features';
-    addParagraph('For any valid lean project, click the robot icon on the left to get started with LeanCopilot, the AI theorem proving assistant. Simply click "Setup LeanCopilot", and add "import LeanCopilot" to the top of any Lean file to start interacting with LeanCopilot!');
+    addParagraph('For any valid lean project, click the robot icon on the left to get started with LeanCopilot, the AI theorem proving assistant!');
     addParagraph('-Never used LeanCopilot before? Get started here: https://github.com/lean-dojo/LeanCopilot');
   
-    addParagraph('To trace any lean project using LeanDojo, simply click the dojo icon on the left hand panel. Enter a name for the trace, and the url and the most recent commit hash (you can find it on GitHub by clicking the circular clock icon right under the green "code" button for any repo, and then clicking the copy button for any commit) of the repo you want to trace. Then, add in your GitHub personal access token. Finally, paste in the version of Lean the repo to trace is using (i.e., paste in the contents of the repo\'s "lean-toolchain" file. Lastly, choose if you want build out the project dependencies in your trace (disababling building dependencies will save significant time in the tracing process). From there, follow the instructions on the left hand side, and wait for your trace to complete!');
+    addParagraph('To trace any lean project using LeanDojo, simply click the dojo icon on the left hand panel to get started!');
     addParagraph('-New to LeanDojo? Read up on it here: https://leandojo.org/');
+
+    addParagraph('For any other assistance, click the "T" icon on the lft hand panel to try using Agent TARS, a fully agentic AI assistant!');
+    addParagraph('What is Agent TARS? Check it our here: https://agent-tars.com')
   
-    addParagraph('We\'re still working on more tools for Lean4Code, including more integrated LeanDojo features, and a implementation of LeanAgent.');
+    addParagraph('We\'re constantly working on new tools. Stay up to date by following our GitHub: https://github.com/lean-dojo');
   
     const hr = document.createElement('hr');
     hr.style.margin = '2rem 0';
