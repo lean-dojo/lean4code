@@ -2,6 +2,7 @@
   <img src="./icons/stable/codium_cnl.svg" alt="Lean4Code Logo" width="200"/>
   <h1>Lean4Code</h1>
   <h3>The Official Build Repo</h3>
+  <h3>Contact: adkisson@wustl.edu</h3>
 </div>
 
 <h2>What is this / why does this exist?</h2>
@@ -26,6 +27,7 @@ You can find the most recently compiled, prebuilt release of Lean4Code under the
   <li>VSCode Lean4 extension downloaded and built in</li>
   <li>Automatic download and integration of LeanCopilot</li>
   <li>A one-click LeanDojo tracing experience</li>
+  <li>An integrated agentic AI assistant</li>
 </ul>
 <p>And we’re still working on new features!</p>
 
