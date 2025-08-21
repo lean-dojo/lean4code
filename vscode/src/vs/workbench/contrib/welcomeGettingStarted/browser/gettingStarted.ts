@@ -137,7 +137,7 @@ export class GettingStartedPage extends EditorPane {
     noteSection.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
     
     const noteText = document.createElement('p');
-    noteText.textContent = 'This is the beta version of Lean4Code. This is our first iteration of the app, and is not meant to be a final product. Please report any errors you encounter using Lean4Code using the issues tab, or send an email to adkisson@wustl.edu.';
+    noteText.textContent = 'Please report any errors you encounter using Lean4Code using the issues tab, or send an email to adkisson@wustl.edu.';
     noteText.style.margin = '0';
     noteSection.appendChild(noteText);
     
