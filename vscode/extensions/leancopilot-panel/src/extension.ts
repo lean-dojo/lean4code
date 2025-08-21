@@ -177,6 +177,75 @@ rev = "main"
       }
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('leanCopilot.integrateIntoProject', async () => {
+      const folder = vscode.workspace.workspaceFolders?.[0];
+      if (!folder) {
+        vscode.window.showErrorMessage('No workspace folder found.');
+        return;
+      }
+
+      const projectPath = folder.uri.fsPath;
+      
+      // Find Main.lean file
+      const mainLeanPath = path.join(projectPath, 'Main.lean');
+      if (!fs.existsSync(mainLeanPath)) {
+        vscode.window.showErrorMessage('Could not find Main.lean file in project.');
+        return;
+      }
+
+      try {
+        // Add import statement to Main.lean
+        let mainContent = fs.readFileSync(mainLeanPath, 'utf-8');
+        if (!mainContent.includes('import LeanCopilot')) {
+          mainContent = 'import LeanCopilot\n' + mainContent;
+          fs.writeFileSync(mainLeanPath, mainContent);
+          vscode.window.showInformationMessage('✅ Added import LeanCopilot to Main.lean');
+        } else {
+          vscode.window.showInformationMessage('ℹ️ import LeanCopilot already exists in Main.lean');
+        }
+
+        // Wait a bit
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const run = (cmd: string, label: string) =>
+          new Promise<void>((resolve, reject) => {
+            vscode.window.showInformationMessage(label);
+            exec(cmd, { cwd: projectPath }, (err, stdout, stderr) => {
+              if (err) reject(stderr || stdout);
+              else resolve();
+            });
+          });
+
+        // Check if Lean 4.21.0-rc3 is already installed
+        const checkToolchain = (cmd: string) =>
+          new Promise<boolean>((resolve) => {
+            exec(cmd, { cwd: projectPath }, (err, stdout, stderr) => {
+              resolve(!err);
+            });
+          });
+
+        const isToolchainInstalled = await checkToolchain('elan toolchain list | grep "leanprover/lean4:v4.21.0-rc3"');
+        
+        if (isToolchainInstalled) {
+          vscode.window.showInformationMessage('ℹ️ Lean 4.21.0-rc3 toolchain already installed, skipping installation');
+        } else {
+          await run('elan toolchain install leanprover/lean4:v4.21.0-rc3', '🔧 Installing Lean 4.21.0-rc3 toolchain...');
+        }
+        
+        await run('elan override set leanprover/lean4:v4.21.0-rc3', '⚙️ Setting Lean 4.21.0-rc3 as override...');
+        await run('lake clean', '🧹 Cleaning project...');
+        await run('lake update', '📦 Updating dependencies...');
+        await run('lake build', '🔨 Building project...');
+        vscode.window.showInformationMessage('✅ LeanCopilot successfully integrated into your project!');
+        context.workspaceState.update('leanCopilotIntegrated', true);
+        vscode.commands.executeCommand('leanCopilotPanel.refresh');
+      } catch (e: any) {
+        vscode.window.showErrorMessage('❌ Integration failed:\n' + e.toString());
+      }
+    })
+  );
 }
 
 class LeanCopilotPanel implements vscode.WebviewViewProvider {
@@ -206,6 +275,10 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
       }
       if (msg.command === 'openHuggingFaceDocs') {
         vscode.env.openExternal(vscode.Uri.parse('https://huggingface.co/docs/hub/en/security-tokens'));
+      }
+      if (msg.command === 'integrateIntoProject') {
+        this.updateWebviewDownloading();
+        vscode.commands.executeCommand('leanCopilot.integrateIntoProject');
       }
     });
 
@@ -277,7 +350,9 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
   }
 
   private getHtml(installed: boolean): string {
-    if (installed) {
+    const integrated = this.context.workspaceState.get('leanCopilotIntegrated') === true;
+    
+    if (integrated) {
       return `
         <html>
         <head>
@@ -301,8 +376,57 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
           </style>
         </head>
         <body>
+          <h2>🤖 LeanCopilot integrated!</h2>
+          <div class="small">LeanCopilot is now ready to use in your project</div>
+        </body>
+        </html>
+      `;
+    } else if (installed) {
+      return `
+        <html>
+        <head>
+          <style>
+            body {
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              margin: 0;
+              background: var(--vscode-sideBar-background);
+              color: var(--vscode-sideBar-foreground);
+              font-family: sans-serif;
+              gap: 1rem;
+            }
+            button {
+              font-size: 0.9rem;
+              padding: 0.5rem 1rem;
+              background-color: #007acc;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+            }
+            button:hover {
+              background-color: #005fa3;
+            }
+            .small {
+              font-size: 0.9rem;
+              margin-top: 1rem;
+              color: var(--vscode-descriptionForeground);
+            }
+          </style>
+        </head>
+        <body>
           <h2>🤖 LeanCopilot installed!</h2>
           <div class="small">Add "import LeanCopilot" to the top of your Lean file to get started</div>
+          <button onclick="integrateIntoProject()">Integrate LeanCopilot into your project</button>
+          <script>
+            const vscode = acquireVsCodeApi();
+            function integrateIntoProject() {
+              vscode.postMessage({ command: 'integrateIntoProject' });
+            }
+          </script>
         </body>
         </html>
       `;
