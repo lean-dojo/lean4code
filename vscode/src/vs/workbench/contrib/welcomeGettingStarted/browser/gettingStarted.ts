@@ -121,7 +121,7 @@ export class GettingStartedPage extends EditorPane {
     addParagraph('-New to LeanDojo? Read up on it here: https://leandojo.org/');
 
     addParagraph('For any other assistance, click the "T" icon on the lft hand panel to try using Agent TARS, a fully agentic AI assistant!');
-    addParagraph('What is Agent TARS? Check it our here: https://agent-tars.com')
+    addParagraph('-What is Agent TARS? Check it our here: https://agent-tars.com')
   
     addParagraph('We\'re constantly working on new tools. Stay up to date by following our GitHub: https://github.com/lean-dojo');
   
