@@ -24,7 +24,7 @@ You can find the most recently compiled, prebuilt release of Lean4Code under the
 <p>Lean4Code comes with…</p>
 <ul>
   <li>VSCode Lean4 extension downloaded and built in</li>
-  <li>Built in scripts to for automatic download and integration of LeanCopilot into any repo</li>
+  <li>Automatic download and integration of LeanCopilot</li>
   <li>A one-click LeanDojo tracing experience</li>
 </ul>
 <p>And we’re still working on new features!</p>
