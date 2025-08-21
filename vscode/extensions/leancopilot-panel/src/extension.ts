@@ -419,8 +419,7 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
         </head>
         <body>
           <h2>🤖 LeanCopilot installed!</h2>
-          <div class="small">Add "import LeanCopilot" to the top of your Lean file to get started</div>
-          <button onclick="integrateIntoProject()">Integrate LeanCopilot into your project</button>
+          <button onclick="integrateIntoProject()">Import LeanCopilot into your project</button>
           <script>
             const vscode = acquireVsCodeApi();
             function integrateIntoProject() {
