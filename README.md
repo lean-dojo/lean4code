@@ -12,8 +12,6 @@ We wanted to minimize the bar of entry for getting started with Lean and using L
 This is our solution, a code editor with a truly intuitive Lean experience.
 </p>
 
-<p><strong>Note:</strong> This is the beta version of Lean4Code. This is our first iteration of the app, and is not meant to be a final product. Please report any errors you encounter using Lean4Code using the issues tab, or send an email to adkisson@wustl.edu.</p>
-
 <h2>Supported versions:</h2>
 
 <p>
