@@ -147,11 +147,22 @@ rev = "main"
         modified = true;
       }
 
+      if (!content.includes('LeanSearchClient')) {
+        content += `
+
+[[require]]
+name = "LeanSearchClient"
+git = "https://github.com/leanprover-community/LeanSearchClient.git"
+rev = "main"
+`;
+        modified = true;
+      }
+
       if (modified) {
         fs.writeFileSync(lakefile, content);
-        vscode.window.showInformationMessage('✅ lakefile.toml updated with external_api config.');
+        vscode.window.showInformationMessage('✅ lakefile.toml updated with external_api and LeanSearchClient config.');
       } else {
-        vscode.window.showInformationMessage('ℹ️ external_api was already configured.');
+        vscode.window.showInformationMessage('ℹ️ external_api and LeanSearchClient were already configured.');
       }
 
       const run = (cmd: string, label: string) =>
@@ -199,9 +210,9 @@ rev = "main"
         // Add import statement to Main.lean
         let mainContent = fs.readFileSync(mainLeanPath, 'utf-8');
         if (!mainContent.includes('import LeanCopilot')) {
-          mainContent = 'import LeanCopilot\n' + mainContent;
+          mainContent = 'import LeanCopilot\n' + 'import LeanSearchClient\n' + mainContent;
           fs.writeFileSync(mainLeanPath, mainContent);
-          vscode.window.showInformationMessage('✅ Added import LeanCopilot to Main.lean');
+          vscode.window.showInformationMessage('✅ Added import LeanCopilot and LeanSearchClient to Main.lean');
         } else {
           vscode.window.showInformationMessage('ℹ️ import LeanCopilot already exists in Main.lean');
         }
