@@ -245,7 +245,6 @@ rev = "main"
           await run('elan toolchain install leanprover/lean4:v4.21.0-rc3', '🔧 Installing Lean 4.21.0-rc3 toolchain...');
         }
         
-        await run('elan override set leanprover/lean4:v4.21.0-rc3', '⚙️ Setting Lean 4.21.0-rc3 as override...');
         await run('lake clean', '🧹 Cleaning project...');
         await run('lake update', '📦 Updating dependencies...');
         await run('lake build', '🔨 Building project...');
