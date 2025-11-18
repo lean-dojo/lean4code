@@ -13,6 +13,11 @@ import { Event } from '../../../base/common/event.js';
 import { DisposableStore } from '../../../base/common/lifecycle.js';
 
 export class ExtensionSecrets implements vscode.SecretStorage {
+	keys(): Thenable<string[]> {
+		// TEMP implementation: no keys.
+		// Replace with a real one later if needed.
+		return Promise.resolve([]);
+	}
 
 	protected readonly _id: string;
 	readonly #secretState: ExtHostSecretState;

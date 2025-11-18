@@ -291,15 +291,32 @@ export function createApiFactoryAndRegisterActors(accessor: ServicesAccessor): I
 		})();
 
 		const authentication: typeof vscode.authentication = {
-			getSession(providerId: string, scopes: readonly string[], options?: vscode.AuthenticationGetSessionOptions) {
+			getSession: ((
+				providerId: string,
+				scopeListOrRequest: readonly string[] | vscode.AuthenticationWwwAuthenticateRequest,
+				options?: vscode.AuthenticationGetSessionOptions
+			) => {
+				let scopes: readonly string[];
+		
+				if (Array.isArray(scopeListOrRequest)) {
+					// Normal case: called with ['scope1', 'scope2']
+					scopes = scopeListOrRequest;
+				} else {
+					// Newer overload: called with an AuthenticationWwwAuthenticateRequest
+					// Extract scopes from the request object - using type assertion to handle unknown structure
+					const request = scopeListOrRequest as any;
+					scopes = request.scopes ?? request.scope ?? [];
+				}
+		
 				if (
 					(typeof options?.forceNewSession === 'object' && options.forceNewSession.learnMore) ||
 					(typeof options?.createIfNone === 'object' && options.createIfNone.learnMore)
 				) {
 					checkProposedApiEnabled(extension, 'authLearnMore');
 				}
+		
 				return extHostAuthentication.getSession(extension, providerId, scopes, options as any);
-			},
+			}) as any,
 			getAccounts(providerId: string) {
 				return extHostAuthentication.getAccounts(providerId);
 			},
@@ -1491,6 +1508,10 @@ export function createApiFactoryAndRegisterActors(accessor: ServicesAccessor): I
 				checkProposedApiEnabled(extension, 'chatProvider');
 				return extHostLanguageModels.registerLanguageModel(extension, id, provider, metadata);
 			},
+			registerLanguageModelChatProvider: ((id: string, provider: vscode.LanguageModelChatProvider, metadata: vscode.ChatResponseProviderMetadata) => {
+				checkProposedApiEnabled(extension, 'chatProvider');
+				return extHostLanguageModels.registerLanguageModel(extension, id, provider, metadata);
+			}) as any,
 			// --- embeddings
 			get embeddingModels() {
 				checkProposedApiEnabled(extension, 'embeddings');
