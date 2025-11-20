@@ -229,30 +229,30 @@ export class ProjectInitializationProvider implements Disposable {
             return 'DidNotComplete'
         }
 
-        await this.cloneLeanLibrary(projectFolder)
+        await this.cloneLeanDojov2(projectFolder)
 
         return projectFolder
     }
 
-    private async cloneLeanLibrary(projectFolder: FileUri): Promise<void> {
+    private async cloneLeanDojov2(projectFolder: FileUri): Promise<void> {
         try {
-            const leanLibraryPath = projectFolder.join('LeanLibrary')
-            this.channel.appendLine(`Cloning LeanLibrary repository to ${leanLibraryPath.fsPath}...`)
+            const leanDojov2Path = projectFolder.join('LeanDojo-v2')
+            this.channel.appendLine(`Cloning LeanDojo-v2 repository to ${leanDojov2Path.fsPath}...`)
             
             const result = await batchExecute(
                 'git',
-                ['clone', 'https://github.com/lean-dojo/LeanLibrary', leanLibraryPath.fsPath],
+                ['clone', 'https://github.com/lean-dojo/LeanDojo-v2', leanDojov2Path.fsPath],
                 projectFolder.fsPath,
                 { combined: this.channel }
             )
             
             if (result.exitCode === ExecutionExitCode.Success) {
-                this.channel.appendLine('Successfully cloned LeanLibrary repository.')
+                this.channel.appendLine('Successfully cloned LeanDojo-v2 repository.')
             } else {
-                this.channel.appendLine('Warning: Failed to clone LeanLibrary repository.')
+                this.channel.appendLine('Warning: Failed to clone LeanDojo-v2 repository.')
             }
         } catch (error) {
-            this.channel.appendLine(`Warning: Error cloning LeanLibrary repository: ${error}`)
+            this.channel.appendLine(`Warning: Error cloning LeanDojo-v2 repository: ${error}`)
         }
     }
 
