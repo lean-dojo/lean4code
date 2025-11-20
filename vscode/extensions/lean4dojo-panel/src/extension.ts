@@ -160,8 +160,8 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       const traceScript = this.generateTraceScript( repoUrl, commitHash, token.trim(), leanVersion.trim(), cachePath, tmpPath);
       fs.writeFileSync(path.join(tracePath, 'trace_repo.py'), traceScript);
 
-       // Clone LeanLibrary into the trace subdirectory (run exactly as requested)
-       exec(`git clone https://github.com/lean-dojo/LeanLibrary`, { cwd: tracePath }, () => { /* ignore result */ });
+       // Clone LeanDojo-v2 into the trace subdirectory (run exactly as requested)
+       exec(`git clone https://github.com/lean-dojo/LeanDojo-v2`, { cwd: tracePath }, () => { /* ignore result */ });
 
       // Clone repo
       exec(`git clone "${repoUrl}" .`, { cwd: repoPath }, (error) => {
