@@ -137,13 +137,30 @@ moreLinkArgs = [
       let modified = false;
 
       if (!content.includes('external_api')) {
-        content += `
+        // Check if the local external_ai/external_api exists in LeanDojo-v2
+        const localExternalApiPath = path.join(projectPath, 'LeanDojo-v2', 'lean_dojo_v2', 'external_api');
+        const localExternalApiLakefile = path.join(localExternalApiPath, 'lakefile.toml');
+        const localExternalApiLakefileLean = path.join(localExternalApiPath, 'lakefile.lean');
+        
+        // Check for either lakefile.toml or lakefile.lean
+        if (fs.existsSync(localExternalApiLakefile) || fs.existsSync(localExternalApiLakefileLean)) {
+          // Use local path dependency instead of git repo
+          content += `
+
+[[require]]
+name = "external_api"
+path = "./LeanDojo-v2/lean_dojo_v2/external_api"
+`;
+        } else {
+          // Fall back to git repository if local path doesn't exist
+          content += `
 
 [[require]]
 name = "external_api"
 git = "https://github.com/wadkisson/external_api_hf"
 rev = "main"
 `;
+        }
         modified = true;
       }
 
