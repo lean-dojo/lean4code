@@ -292,10 +292,6 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
         this.updateWebviewDownloading();
         vscode.commands.executeCommand('leanCopilot.setupToml');
       }
-      if (msg.command === 'runModelsRemotely') {
-        this.updateWebviewDownloading();
-        vscode.commands.executeCommand('leanCopilot.runModelsRemotely');
-      }
       if (msg.command === 'runHuggingFace') {
         this.handleHuggingFaceSetup();
         vscode.commands.executeCommand('leanCopilot.runHuggingFaceModels');
@@ -490,19 +486,6 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
             .huggingface-button:hover {
               background-color: #005fa3;
             }
-            .remote-button {
-              background-color: #6c757d;
-              cursor: not-allowed;
-              opacity: 0.6;
-            }
-            .remote-button:hover {
-              background-color: #6c757d;
-            }
-            .disabled-text {
-              font-size: 0.8rem;
-              color: var(--vscode-descriptionForeground);
-              margin-top: 0.5rem;
-            }
             .separator {
               width: 100%;
               text-align: center;
@@ -544,10 +527,6 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
           <div class="separator">---</div>
           
           <button onclick="setup()">Download LeanCopilot locally</button>
-          <div style="display: flex; flex-direction: column; align-items: center;">
-            <button class="remote-button" disabled>Run models remotely</button>
-            <div class="disabled-text">temporarily disabled</div>
-          </div>
           <script>
             const vscode = acquireVsCodeApi();
             function setup() {
