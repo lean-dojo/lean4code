@@ -37,11 +37,24 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
+      // Step 1: Always use "main" for LeanCopilot
+      const leanCopilotVersion = 'main';
+
       let content = fs.readFileSync(lakefile, 'utf-8');
       let modified = false;
 
+      // Step 2: Add moreLinkArgs and require LeanCopilot
       if (fileType === 'toml') {
-        if (!content.includes('LeanCopilot')) {
+        // Add moreLinkArgs (single line format as per instructions)
+        if (!content.includes('moreLinkArgs')) {
+          content += `
+
+moreLinkArgs = ["-L./.lake/packages/LeanCopilot/.lake/build/lib", "-lctranslate2"]
+`;
+          modified = true;
+        }
+        // Add require LeanCopilot
+        if (!content.includes('name = "LeanCopilot"')) {
           content += `
 
 [[require]]
@@ -51,29 +64,26 @@ rev = "main"
 `;
           modified = true;
         }
-        if (!content.includes('moreLinkArgs')) {
-          content += `
-
-moreLinkArgs = [
-  "-L./.lake/packages/LeanCopilot/.lake/build/lib",
-  "-lctranslate2"
-]
-`;
-          modified = true;
-        }
       } else if (fileType === 'lean') {
-        if (!content.includes('require LeanCopilot')) {
-          content += `\nrequire LeanCopilot from git \"https://github.com/lean-dojo/LeanCopilot.git\" @ \"main\"\n`;
-          modified = true;
-        }
+        // Add moreLinkArgs to package block
         if (!content.includes('moreLinkArgs')) {
           const packageBlockMatch = content.match(/package\s+«[^»]+»\s*{[\s\S]*?}/);
           if (packageBlockMatch) {
-            const newBlock = packageBlockMatch[0].replace(/}$/, `  moreLinkArgs := #[\n    \"-L./.lake/packages/LeanCopilot/.lake/build/lib\",\n    \"-lctranslate2\"\n  ]\n}`);
-            content = content.replace(packageBlockMatch[0], newBlock);
+            // Check if package block already has moreLinkArgs
+            if (!packageBlockMatch[0].includes('moreLinkArgs')) {
+              const newBlock = packageBlockMatch[0].replace(/}$/, `  moreLinkArgs := #[\n    "-L./.lake/packages/LeanCopilot/.lake/build/lib",\n    "-lctranslate2"\n  ]\n}`);
+              content = content.replace(packageBlockMatch[0], newBlock);
+              modified = true;
+            }
           } else {
-            content += `\npackage «my-package» {\n  moreLinkArgs := #[\n    \"-L./.lake/packages/LeanCopilot/.lake/build/lib\",\n    \"-lctranslate2\"\n  ]\n}\n`;
+            // No package block found, create one
+            content += `\npackage «my-package» {\n  moreLinkArgs := #[\n    "-L./.lake/packages/LeanCopilot/.lake/build/lib",\n    "-lctranslate2"\n  ]\n}\n`;
+            modified = true;
           }
+        }
+        // Add require LeanCopilot
+        if (!content.includes('require LeanCopilot')) {
+          content += `\nrequire LeanCopilot from git "https://github.com/lean-dojo/LeanCopilot.git" @ "main"\n`;
           modified = true;
         }
       }
@@ -83,6 +93,14 @@ moreLinkArgs = [
         vscode.window.showInformationMessage(`✅ ${fileType === 'toml' ? 'lakefile.toml' : 'lakefile.lean'} updated with LeanCopilot config.`);
       } else {
         vscode.window.showInformationMessage('ℹ️ LeanCopilot was already configured.');
+      }
+
+      // Step 3: Handle Windows Path variable
+      if (process.platform === 'win32') {
+        const leanCopilotLibPath = path.join(projectPath, '.lake', 'packages', 'LeanCopilot', '.lake', 'build', 'lib');
+        vscode.window.showWarningMessage(
+          `⚠️ For native Windows, please add the following to your Path variable in Advanced System Settings > Environment Variables... > System variables:\n${leanCopilotLibPath}\n\nThis will be needed after running 'lake update LeanCopilot'.`
+        );
       }
 
       const run = (cmd: string, label: string) =>
@@ -97,15 +115,13 @@ moreLinkArgs = [
       try {
         panelInstance.updateWebviewDownloading();
 
+        // Step 4: Run lake update LeanCopilot
         await run('lake update LeanCopilot', '📦 Running: lake update LeanCopilot...');
-        const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-        const cachePath = path.join(homeDir, '.cache', 'lean_copilot');
-        if (fs.existsSync(cachePath)) {
-          vscode.window.showInformationMessage('ℹ️ Models already downloaded, skipping download step.');
-        } else {
-          await run('lake exe LeanCopilot/download', '⬇️ Downloading models...');
-        }
+        
+        // Step 5: Run lake exe LeanCopilot/download (always run, no cache check)
+        await run('lake exe LeanCopilot/download', '⬇️ Downloading built-in models from Hugging Face to ~/.cache/lean_copilot/...');
 
+        // Step 6: Run lake build
         await run('lake build', '🔧 Building project...');
 
         vscode.window.showInformationMessage('🤖 LeanCopilot successfully installed!');
@@ -227,45 +243,13 @@ rev = "main"
         // Add import statement to Main.lean
         let mainContent = fs.readFileSync(mainLeanPath, 'utf-8');
         if (!mainContent.includes('import LeanCopilot')) {
-          mainContent = 'import LeanCopilot\n' + 'import LeanSearchClient\n' + mainContent;
+          mainContent = 'import LeanCopilot\n' + mainContent;
           fs.writeFileSync(mainLeanPath, mainContent);
-          vscode.window.showInformationMessage('✅ Added import LeanCopilot and LeanSearchClient to Main.lean');
+          vscode.window.showInformationMessage('✅ Added import LeanCopilot to Main.lean');
         } else {
           vscode.window.showInformationMessage('ℹ️ import LeanCopilot already exists in Main.lean');
         }
 
-        // Wait a bit
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        const run = (cmd: string, label: string) =>
-          new Promise<void>((resolve, reject) => {
-            vscode.window.showInformationMessage(label);
-            exec(cmd, { cwd: projectPath }, (err, stdout, stderr) => {
-              if (err) reject(stderr || stdout);
-              else resolve();
-            });
-          });
-
-        // Check if Lean 4.21.0-rc3 is already installed
-        const checkToolchain = (cmd: string) =>
-          new Promise<boolean>((resolve) => {
-            exec(cmd, { cwd: projectPath }, (err, stdout, stderr) => {
-              resolve(!err);
-            });
-          });
-
-        const isToolchainInstalled = await checkToolchain('elan toolchain list | grep "leanprover/lean4:v4.21.0-rc3"');
-        
-        if (isToolchainInstalled) {
-          vscode.window.showInformationMessage('ℹ️ Lean 4.21.0-rc3 toolchain already installed, skipping installation');
-        } else {
-          await run('elan toolchain install leanprover/lean4:v4.21.0-rc3', '🔧 Installing Lean 4.21.0-rc3 toolchain...');
-        }
-        
-        await run('lake clean', '🧹 Cleaning project...');
-        await run('lake update', '📦 Updating dependencies...');
-        await run('lake build', '🔨 Building project...');
-        vscode.window.showInformationMessage('✅ LeanCopilot successfully integrated into your project!');
         context.workspaceState.update('leanCopilotIntegrated', true);
         vscode.commands.executeCommand('leanCopilotPanel.refresh');
       } catch (e: any) {
