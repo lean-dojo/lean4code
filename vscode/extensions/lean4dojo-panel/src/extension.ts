@@ -38,7 +38,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
         case 'cleanupOut': this.handleCleanupOut(); break;
         case 'toggleBuildDeps': this.toggleBuildDeps(); break;
         case 'oneClickTrace' : this.oneClickTrace(); break;
-        case 'traceAndProve': this.handleTraceAndProve(msg.hfToken); break;
+        case 'traceAndProve': this.handleTraceAndProve(); break;
       }
     });
   }
@@ -456,15 +456,10 @@ if __name__ == "__main__":
     await this.handleRunTrace();
   }
 
-  private async handleTraceAndProve(hfToken: string): Promise<void> {
+  private async handleTraceAndProve(): Promise<void> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) {
       vscode.window.showErrorMessage('No workspace folder open');
-      return;
-    }
-
-    if (!hfToken || !hfToken.trim()) {
-      vscode.window.showErrorMessage('HuggingFace token is required');
       return;
     }
 
@@ -500,14 +495,25 @@ if __name__ == "__main__":
         vscode.window.showErrorMessage('Could not extract repository URL and commit hash from trace_repo.py');
         return;
       }
-      if (!githubToken) {
-        vscode.window.showErrorMessage('Could not extract GitHub token from trace_repo.py');
-        return;
-      }
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to read trace_repo.py: ${error.message}`);
       return;
     }
+
+    // Prompt for HuggingFace token
+    const hfToken = await vscode.window.showInputBox({
+      prompt: 'Enter your HuggingFace Personal Access Token (PAT)',
+      password: true,
+      ignoreFocusOut: true
+    });
+
+    if (!hfToken || !hfToken.trim()) {
+      vscode.window.showErrorMessage('HuggingFace token is required');
+      return;
+    }
+
+    // Save the HF token to workspace state
+    this.context.workspaceState.update('hfToken', hfToken.trim());
 
     vscode.window.showInformationMessage('Starting Trace and Prove setup...');
 
@@ -536,29 +542,35 @@ agent.prove(whole_proof=True)
     const proveScriptPath = path.join(leanDojoPath, 'prove_script.py');
     fs.writeFileSync(proveScriptPath, proveScript);
 
+    // Ensure out folder exists
+    const outPath = path.join(root, 'out');
+    fs.mkdirSync(outPath, { recursive: true });
+    const logFilePath = path.join(outPath, 'trace_and_prove_output.log');
+
     // For Windows, we need to adjust the commands
     const isWindows = os.platform() === 'win32';
     
     // Escape tokens for shell commands
-    const escapedGithubToken = githubToken.replace(/'/g, "'\\''");
-    const escapedHfToken = hfToken.trim().replace(/'/g, "'\\''");
+    const escapedGithubToken = githubToken.replace(/'/g, "'\\''").replace(/"/g, '\\"');
+    const escapedHfToken = hfToken.trim().replace(/'/g, "'\\''").replace(/"/g, '\\"');
     
     terminal.sendText(`cd "${leanDojoPath}"`);
     
+    // Run all commands with output redirection to log file
     if (isWindows) {
-      // On Windows, use different commands
-      terminal.sendText('python -m venv .venv');
-      // Export tokens and run setup commands
-      terminal.sendText(`.venv\\Scripts\\activate && set GITHUB_ACCESS_TOKEN=${githubToken} && set HF_TOKEN=${hfToken.trim()} && python -m pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py`);
+      // On Windows, use cmd.exe syntax (venv activation uses batch script)
+      // Escape tokens for Windows cmd (escape quotes and special chars)
+      const winGithubToken = githubToken.replace(/"/g, '""').replace(/&/g, '^&').replace(/</g, '^<').replace(/>/g, '^>').replace(/\|/g, '^|');
+      const winHfToken = hfToken.trim().replace(/"/g, '""').replace(/&/g, '^&').replace(/</g, '^<').replace(/>/g, '^>').replace(/\|/g, '^|');
+      terminal.sendText(`python -m venv .venv > "${logFilePath}" 2>&1`);
+      terminal.sendText(`.venv\\Scripts\\activate && set GITHUB_ACCESS_TOKEN=${winGithubToken} && set HF_TOKEN=${winHfToken} && python -m pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py >> "${logFilePath}" 2>&1`);
     } else {
-      // For Unix-like systems (macOS, Linux)
-      // Use a shell script approach to handle virtual environment activation
-      terminal.sendText('python3 -m venv .venv');
-      // Export tokens and run setup commands
-      terminal.sendText(`source .venv/bin/activate && export GITHUB_ACCESS_TOKEN='${escapedGithubToken}' && export HF_TOKEN='${escapedHfToken}' && pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py`);
+      // For Unix-like systems (macOS, Linux) - redirect all output to log file
+      terminal.sendText(`python3 -m venv .venv > "${logFilePath}" 2>&1`);
+      terminal.sendText(`source .venv/bin/activate && export GITHUB_ACCESS_TOKEN='${escapedGithubToken}' && export HF_TOKEN='${escapedHfToken}' && pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py >> "${logFilePath}" 2>&1`);
     }
 
-    vscode.window.showInformationMessage('Trace and Prove commands sent to terminal. Please monitor the terminal for progress.');
+    vscode.window.showInformationMessage(`Trace and Prove started. All output will be saved to: ${logFilePath}`);
   }
 
   private async handleCleanupOut(): Promise<void> {
@@ -825,31 +837,6 @@ agent.prove(whole_proof=True)
             border-radius: 4px;
             border: 1px solid var(--vscode-input-border);
           }
-          input[type="password"] {
-            width: 100%;
-            padding: 0.5rem;
-            font-size: 0.9rem;
-            border-radius: 4px;
-            border: 1px solid var(--vscode-input-border);
-            background: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
-            box-sizing: border-box;
-            margin-bottom: 1rem;
-          }
-          input[type="password"]::placeholder {
-            color: var(--vscode-input-placeholderForeground);
-          }
-          .hf-token-label {
-            font-size: 0.75rem;
-            color: var(--vscode-descriptionForeground);
-            margin-bottom: 0.25rem;
-            text-align: left;
-            width: 100%;
-          }
-          button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-          }
         </style>
       </head>
       <body>
@@ -857,22 +844,14 @@ agent.prove(whole_proof=True)
         onclick="oneClickTrace()" 
         id="traceButton" 
         ${traceAlreadyCompleted ? 'disabled' : ''}>
-        ${traceAlreadyCompleted ? '✅ Trace completed' : '🔧Trace repo ONLY!'}
+        ${traceAlreadyCompleted ? '✅ Trace completed' : 'Trace ONLY!'}
       </button>
 
       <button 
         onclick="traceAndProve()" 
-        id="traceAndProveButton"
-        disabled>
-        🔬 Trace and Prove Sorrys
+        id="traceAndProveButton">
+        🔬 Trace and Prove
       </button>
-
-      <div class="hf-token-label">HuggingFace Token (optional but needed for gated models)</div>
-      <input 
-        type="password" 
-        id="hfTokenInput" 
-        placeholder="hf_..."
-        oninput="checkHfToken()" />
 
       <div class="trace-completion-info">
         Tracing is complete when "out" folder is populated, this may take a few seconds to a few hours...
@@ -890,26 +869,11 @@ agent.prove(whole_proof=True)
             vscode.postMessage({ command: 'oneClickTrace' });
           }
 
-          function checkHfToken() {
-            const input = document.getElementById('hfTokenInput');
-            const button = document.getElementById('traceAndProveButton');
-            if (input && button) {
-              button.disabled = !input.value || input.value.trim() === '';
-            }
-          }
-
           function traceAndProve() {
             const button = document.getElementById('traceAndProveButton');
-            const input = document.getElementById('hfTokenInput');
-            if (!input || !input.value || input.value.trim() === '') {
-              return;
-            }
             button.disabled = true;
             button.innerText = '🔄 Setting up and proving...';
-            vscode.postMessage({ 
-              command: 'traceAndProve',
-              hfToken: input.value.trim()
-            });
+            vscode.postMessage({ command: 'traceAndProve' });
           }
 
           function cleanupOut() {
