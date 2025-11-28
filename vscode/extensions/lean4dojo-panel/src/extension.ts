@@ -38,6 +38,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
         case 'cleanupOut': this.handleCleanupOut(); break;
         case 'toggleBuildDeps': this.toggleBuildDeps(); break;
         case 'oneClickTrace' : this.oneClickTrace(); break;
+        case 'traceAndProve': this.handleTraceAndProve(msg.hfToken); break;
       }
     });
   }
@@ -455,6 +456,111 @@ if __name__ == "__main__":
     await this.handleRunTrace();
   }
 
+  private async handleTraceAndProve(hfToken: string): Promise<void> {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      vscode.window.showErrorMessage('No workspace folder open');
+      return;
+    }
+
+    if (!hfToken || !hfToken.trim()) {
+      vscode.window.showErrorMessage('HuggingFace token is required');
+      return;
+    }
+
+    const tracePath = path.join(root, 'trace');
+    const traceScriptPath = path.join(tracePath, 'trace_repo.py');
+
+    if (!fs.existsSync(traceScriptPath)) {
+      vscode.window.showErrorMessage('trace_repo.py not found');
+      return;
+    }
+
+    // Extract URL, commit hash, and GitHub token from trace_repo.py
+    let repoUrl = '';
+    let commitHash = '';
+    let githubToken = '';
+    try {
+      const traceScript = fs.readFileSync(traceScriptPath, 'utf8');
+      const urlMatch = traceScript.match(/LeanGitRepo\("([^"]+)"/);
+      const commitMatch = traceScript.match(/LeanGitRepo\("[^"]+",\s*"([^"]+)"/);
+      const tokenMatch = traceScript.match(/os\.environ\['GITHUB_ACCESS_TOKEN'\] = '([^']+)'/);
+      
+      if (urlMatch) {
+        repoUrl = urlMatch[1];
+      }
+      if (commitMatch) {
+        commitHash = commitMatch[1];
+      }
+      if (tokenMatch) {
+        githubToken = tokenMatch[1];
+      }
+
+      if (!repoUrl || !commitHash) {
+        vscode.window.showErrorMessage('Could not extract repository URL and commit hash from trace_repo.py');
+        return;
+      }
+      if (!githubToken) {
+        vscode.window.showErrorMessage('Could not extract GitHub token from trace_repo.py');
+        return;
+      }
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to read trace_repo.py: ${error.message}`);
+      return;
+    }
+
+    vscode.window.showInformationMessage('Starting Trace and Prove setup...');
+
+    // Get the terminal and run commands
+    const terminal = vscode.window.createTerminal('LeanDojo Trace and Prove');
+    terminal.show();
+
+    // Check if LeanDojo-v2 directory exists in trace folder
+    const leanDojoPath = path.join(tracePath, 'LeanDojo-v2');
+    if (!fs.existsSync(leanDojoPath)) {
+      vscode.window.showErrorMessage('LeanDojo-v2 directory not found. Please run trace first or create a project.');
+      return;
+    }
+
+    // Create the prove script
+    const proveScript = `from lean_dojo_v2.agent import ExternalAgent
+
+url = "${repoUrl}"
+commit = "${commitHash}"
+
+agent = ExternalAgent(model_name="deepseek-ai/DeepSeek-Prover-V2-671B:novita")
+agent.setup_github_repository(url=url, commit=commit)
+agent.prove(whole_proof=True)
+`;
+
+    const proveScriptPath = path.join(leanDojoPath, 'prove_script.py');
+    fs.writeFileSync(proveScriptPath, proveScript);
+
+    // For Windows, we need to adjust the commands
+    const isWindows = os.platform() === 'win32';
+    
+    // Escape tokens for shell commands
+    const escapedGithubToken = githubToken.replace(/'/g, "'\\''");
+    const escapedHfToken = hfToken.trim().replace(/'/g, "'\\''");
+    
+    terminal.sendText(`cd "${leanDojoPath}"`);
+    
+    if (isWindows) {
+      // On Windows, use different commands
+      terminal.sendText('python -m venv .venv');
+      // Export tokens and run setup commands
+      terminal.sendText(`.venv\\Scripts\\activate && set GITHUB_ACCESS_TOKEN=${githubToken} && set HF_TOKEN=${hfToken.trim()} && python -m pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py`);
+    } else {
+      // For Unix-like systems (macOS, Linux)
+      // Use a shell script approach to handle virtual environment activation
+      terminal.sendText('python3 -m venv .venv');
+      // Export tokens and run setup commands
+      terminal.sendText(`source .venv/bin/activate && export GITHUB_ACCESS_TOKEN='${escapedGithubToken}' && export HF_TOKEN='${escapedHfToken}' && pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py`);
+    }
+
+    vscode.window.showInformationMessage('Trace and Prove commands sent to terminal. Please monitor the terminal for progress.');
+  }
+
   private async handleCleanupOut(): Promise<void> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) return;
@@ -719,6 +825,31 @@ if __name__ == "__main__":
             border-radius: 4px;
             border: 1px solid var(--vscode-input-border);
           }
+          input[type="password"] {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border: 1px solid var(--vscode-input-border);
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            box-sizing: border-box;
+            margin-bottom: 1rem;
+          }
+          input[type="password"]::placeholder {
+            color: var(--vscode-input-placeholderForeground);
+          }
+          .hf-token-label {
+            font-size: 0.75rem;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 0.25rem;
+            text-align: left;
+            width: 100%;
+          }
+          button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
         </style>
       </head>
       <body>
@@ -726,8 +857,22 @@ if __name__ == "__main__":
         onclick="oneClickTrace()" 
         id="traceButton" 
         ${traceAlreadyCompleted ? 'disabled' : ''}>
-        ${traceAlreadyCompleted ? '✅ Trace completed' : '🔧 Click here to trace your repo!'}
+        ${traceAlreadyCompleted ? '✅ Trace completed' : '🔧Trace repo ONLY!'}
       </button>
+
+      <button 
+        onclick="traceAndProve()" 
+        id="traceAndProveButton"
+        disabled>
+        🔬 Trace and Prove Sorrys
+      </button>
+
+      <div class="hf-token-label">HuggingFace Token (optional but needed for gated models)</div>
+      <input 
+        type="password" 
+        id="hfTokenInput" 
+        placeholder="hf_..."
+        oninput="checkHfToken()" />
 
       <div class="trace-completion-info">
         Tracing is complete when "out" folder is populated, this may take a few seconds to a few hours...
@@ -743,6 +888,28 @@ if __name__ == "__main__":
             button.disabled = true;
             button.innerText = '🔄 Tracing repo...';
             vscode.postMessage({ command: 'oneClickTrace' });
+          }
+
+          function checkHfToken() {
+            const input = document.getElementById('hfTokenInput');
+            const button = document.getElementById('traceAndProveButton');
+            if (input && button) {
+              button.disabled = !input.value || input.value.trim() === '';
+            }
+          }
+
+          function traceAndProve() {
+            const button = document.getElementById('traceAndProveButton');
+            const input = document.getElementById('hfTokenInput');
+            if (!input || !input.value || input.value.trim() === '') {
+              return;
+            }
+            button.disabled = true;
+            button.innerText = '🔄 Setting up and proving...';
+            vscode.postMessage({ 
+              command: 'traceAndProve',
+              hfToken: input.value.trim()
+            });
           }
 
           function cleanupOut() {
