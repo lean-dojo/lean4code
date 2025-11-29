@@ -31,7 +31,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
     view.webview.onDidReceiveMessage(msg => {
       switch (msg.command) {
-        case 'createProject': this.handleCreateProject(msg.repoUrl, msg.commitHash, msg.projectName, msg.token, msg.leanVersion); break;
+        case 'createProject': this.handleCreateProject(msg.repoUrl, msg.commitHash, msg.projectName, msg.token); break;
         case 'installPython': this.handleInstallPython(); break;
         case 'installLean': this.handleInstallLean(); break;
         case 'runTrace': this.handleRunTrace(); break;
@@ -106,7 +106,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     return /^[a-f0-9]{7,40}$/i.test(hash);
   }
 
-  private async handleCreateProject(repoUrl: string, commitHash: string, projectName: string, token: string, leanVersion: string) {
+  private async handleCreateProject(repoUrl: string, commitHash: string, projectName: string, token: string) {
     if (!this.isValidUrl(repoUrl)) {
       vscode.window.showErrorMessage('Please enter a valid GitHub repository URL');
       return;
@@ -124,11 +124,6 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
     if (!token.trim()) {
       vscode.window.showErrorMessage('Please enter a Personal Access Token');
-      return;
-    }
-
-    if (!leanVersion.trim()) {
-      vscode.window.showErrorMessage('Please enter a Lean version');
       return;
     }
 
@@ -158,7 +153,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       // Note: out folder will be created by the trace function
 
       // Create trace script
-      const traceScript = this.generateTraceScript( repoUrl, commitHash, token.trim(), leanVersion.trim(), cachePath, tmpPath);
+      const traceScript = this.generateTraceScript( repoUrl, commitHash, token.trim(), cachePath, tmpPath);
       fs.writeFileSync(path.join(tracePath, 'trace_repo.py'), traceScript);
 
        // Clone LeanDojo-v2 into the trace subdirectory (run exactly as requested)
@@ -191,7 +186,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     }
   }
 
-  private generateTraceScript( repoUrl: string, commitHash: string, token: string, leanVersion: string, cacheDir: string, tmpDir: string): string {
+  private generateTraceScript( repoUrl: string, commitHash: string, token: string, cacheDir: string, tmpDir: string): string {
     return `import subprocess
 import shutil
 import os
@@ -222,14 +217,19 @@ def write_status(message, status="info"):
 
 def main():
     write_status(f"✅ Using Python: {sys.executable}")
-    write_status(f"✅ Using Lean version: ${leanVersion}")
 
     repo_path = "../repo"
     write_status(f"Using repo folder: {repo_path}")
 
-    # Use the provided Lean version instead of detecting from lean-toolchain
-    lean_version = "${leanVersion}"
-    write_status(f"Using specified Lean version: {lean_version}")
+    # Auto-detect Lean version from lean-toolchain file
+    lean_toolchain_path = os.path.join(repo_path, "lean-toolchain")
+    if os.path.exists(lean_toolchain_path):
+        with open(lean_toolchain_path, "r") as f:
+            lean_version = f.read().strip()
+        write_status(f"Detected Lean version from lean-toolchain: {lean_version}")
+    else:
+        write_status("⚠️ lean-toolchain file not found, using default Lean version")
+        lean_version = "leanprover/lean4:stable"
 
     write_status("Building the repo with lake...")
     subprocess.run(["lake", "build"], cwd=repo_path, check=True)
@@ -691,9 +691,6 @@ agent.prove(whole_proof=True)
           
           <div class="field-label">Personal Access Token</div>
           <input id="tokenInput" type="password" placeholder="GitHub PAT for unlimited API access" />
-          
-          <div class="field-label">Lean Version</div>
-          <input id="leanVersionInput" type="text" placeholder="e.g., leanprover/lean4:v4.21.0-rc3" />
 
           <button onclick="toggleBuildDeps()">🔁 Toggle build_deps (Currently: ${this.buildDeps ? 'True' : 'False'})</button>
           
@@ -708,15 +705,13 @@ agent.prove(whole_proof=True)
             const repoUrl = document.getElementById('repoInput').value;
             const commitHash = document.getElementById('commitInput').value;
             const token = document.getElementById('tokenInput').value;
-            const leanVersion = document.getElementById('leanVersionInput').value;
             
             vscode.postMessage({ 
               command: 'createProject', 
               projectName: projectName,
               repoUrl: repoUrl,
               commitHash: commitHash,
-              token: token,
-              leanVersion: leanVersion
+              token: token
             });
           }
           
@@ -739,12 +734,6 @@ agent.prove(whole_proof=True)
           });
           
           document.getElementById('tokenInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-              document.getElementById('leanVersionInput').focus();
-            }
-          });
-          
-          document.getElementById('leanVersionInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
               createProject();
             }
