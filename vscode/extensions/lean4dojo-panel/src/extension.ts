@@ -391,7 +391,7 @@ if __name__ == "__main__":
     }
 
     this.tracingInProgress = true;
-    this.traceMessage = 'Starting trace...';
+    this.traceMessage = '🔄 Tracing repo...';
     this.updatePanel();
 
     vscode.window.showInformationMessage('Running trace...');
@@ -401,8 +401,6 @@ if __name__ == "__main__":
 
     const tryNextCommand = () => {
       if (currentIndex >= pythonCommands.length) {
-        this.tracingInProgress = false;
-        this.updatePanel();
         vscode.window.showErrorMessage('No Python installation found. Please install Python first.');
         return;
       }
@@ -410,23 +408,12 @@ if __name__ == "__main__":
       const pythonCmd = pythonCommands[currentIndex];
       const child = spawn(pythonCmd, [traceScriptPath], { cwd: tracePath });
 
-      child.stdout.on('data', (data) => {
-        this.traceMessage = data.toString().trim();
-        this.updatePanel();
-      });
-
-      child.stderr.on('data', (data) => {
-        this.traceMessage = data.toString().trim();
-        this.updatePanel();
-      });
-
       child.on('error', () => {
         currentIndex++;
         tryNextCommand();
       });
 
       child.on('close', (code) => {
-        this.tracingInProgress = false;
         this.removeAllGitFolders(root);
         if (code !== 0) {
           vscode.window.showErrorMessage(
@@ -440,10 +427,8 @@ if __name__ == "__main__":
               });
             }
           });
-          this.traceMessage = '❌ Trace failed';
         } else {
           vscode.window.showInformationMessage('✅ Trace completed successfully');
-          this.traceMessage = '✅ Trace completed successfully!';
           fs.writeFileSync(path.join(root, 'out', 'trace_done.flag'), 'done');
         }
         this.updatePanel();
@@ -473,6 +458,8 @@ if __name__ == "__main__":
     }
 
     this.waitingForHfToken = false;
+    this.tracingInProgress = true;
+    this.traceMessage = '🔄 Tracing repo...';
     this.updatePanel();
 
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -772,6 +759,43 @@ agent.prove(whole_proof=True)
       }
     } catch {}
 
+    // If a trace (or trace+prove) is in progress, show a dedicated tracing screen
+    if (this.tracingInProgress) {
+      const message = this.traceMessage || '🔄 Tracing repo...';
+      return `
+        <html>
+        <head>
+          <style>
+            body {
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              margin: 0;
+              background: var(--vscode-sideBar-background);
+              color: var(--vscode-sideBar-foreground);
+              font-family: sans-serif;
+              padding: 1rem;
+            }
+            .trace-message {
+              font-size: 0.9rem;
+              color: var(--vscode-descriptionForeground);
+              text-align: center;
+              padding: 0.75rem 1rem;
+              background: var(--vscode-input-background);
+              border-radius: 4px;
+              border: 1px solid var(--vscode-input-border);
+            }
+          </style>
+        </head>
+        <body>
+          <div class="trace-message">${message}</div>
+        </body>
+        </html>
+      `;
+    }
+
     return `
       <html>
       <head>
@@ -870,7 +894,7 @@ agent.prove(whole_proof=True)
 
       <div class="hf-token-section ${this.waitingForHfToken ? 'visible' : ''}" id="hfTokenSection">
         <div class="hf-token-label">LeanDojo-v2 requires a HuggingFace Personal Access Token</div>
-        <input id="hfTokenInput" type="password" placeholder="Enter your Token />
+        <input id="hfTokenInput" type="password" placeholder="Enter your Token" />
         <button onclick="cancelHfToken()" style="margin-top: 0.5rem;">Cancel</button>
       </div>
 
