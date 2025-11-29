@@ -21,6 +21,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
   private tracingInProgress = false;
   private traceMessage = '';
   private buildDeps = false;
+  private waitingForHfToken = false;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -39,6 +40,8 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
         case 'toggleBuildDeps': this.toggleBuildDeps(); break;
         case 'oneClickTrace' : this.oneClickTrace(); break;
         case 'traceAndProve': this.handleTraceAndProve(); break;
+        case 'submitHfToken': this.handleSubmitHfToken(msg.hfToken); break;
+        case 'cancelHfToken': this.waitingForHfToken = false; this.updatePanel(); break;
       }
     });
   }
@@ -456,7 +459,22 @@ if __name__ == "__main__":
     await this.handleRunTrace();
   }
 
-  private async handleTraceAndProve(): Promise<void> {
+  private handleTraceAndProve(): void {
+    this.waitingForHfToken = true;
+    this.updatePanel();
+  }
+
+  private async handleSubmitHfToken(hfToken: string): Promise<void> {
+    if (!hfToken || !hfToken.trim()) {
+      vscode.window.showErrorMessage('HuggingFace token is required');
+      this.waitingForHfToken = false;
+      this.updatePanel();
+      return;
+    }
+
+    this.waitingForHfToken = false;
+    this.updatePanel();
+
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) {
       vscode.window.showErrorMessage('No workspace folder open');
@@ -497,18 +515,6 @@ if __name__ == "__main__":
       }
     } catch (error: any) {
       vscode.window.showErrorMessage(`Failed to read trace_repo.py: ${error.message}`);
-      return;
-    }
-
-    // Prompt for HuggingFace token
-    const hfToken = await vscode.window.showInputBox({
-      prompt: 'Enter your HuggingFace Personal Access Token (PAT)',
-      password: true,
-      ignoreFocusOut: true
-    });
-
-    if (!hfToken || !hfToken.trim()) {
-      vscode.window.showErrorMessage('HuggingFace token is required');
       return;
     }
 
@@ -826,19 +832,52 @@ agent.prove(whole_proof=True)
             border-radius: 4px;
             border: 1px solid var(--vscode-input-border);
           }
+          input[type="password"] {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border: 1px solid var(--vscode-input-border);
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            box-sizing: border-box;
+            margin-bottom: 1rem;
+          }
+          .hf-token-section {
+            display: none;
+            width: 100%;
+            margin-bottom: 1rem;
+          }
+          .hf-token-section.visible {
+            display: block;
+          }
+          .hf-token-label {
+            font-size: 0.75rem;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 0.5rem;
+            text-align: center;
+          }
         </style>
       </head>
       <body>
       <button 
         onclick="oneClickTrace()" 
         id="traceButton" 
-        ${traceAlreadyCompleted ? 'disabled' : ''}>
+        ${traceAlreadyCompleted ? 'disabled' : ''}
+        ${this.waitingForHfToken ? 'style="display: none;"' : ''}>
         ${traceAlreadyCompleted ? '✅ Trace completed' : 'Trace ONLY!'}
       </button>
 
+      <div class="hf-token-section ${this.waitingForHfToken ? 'visible' : ''}" id="hfTokenSection">
+        <div class="hf-token-label">LeanDojo-v2 requires a HuggingFace Personal Access Token</div>
+        <input id="hfTokenInput" type="password" placeholder="Enter your Token />
+        <button onclick="cancelHfToken()" style="margin-top: 0.5rem;">Cancel</button>
+      </div>
+
       <button 
         onclick="traceAndProve()" 
-        id="traceAndProveButton">
+        id="traceAndProveButton"
+        ${this.waitingForHfToken ? 'style="display: none;"' : ''}>
         🔬 Trace and Prove
       </button>
 
@@ -859,10 +898,38 @@ agent.prove(whole_proof=True)
           }
 
           function traceAndProve() {
-            const button = document.getElementById('traceAndProveButton');
-            button.disabled = true;
-            button.innerText = '🔄 Setting up and proving...';
             vscode.postMessage({ command: 'traceAndProve' });
+            const input = document.getElementById('hfTokenInput');
+            if (input) {
+              setTimeout(() => input.focus(), 100);
+            }
+          }
+
+          function submitHfToken() {
+            const input = document.getElementById('hfTokenInput');
+            if (!input) return;
+            const token = input.value;
+            if (!token || !token.trim()) {
+              return;
+            }
+            vscode.postMessage({ command: 'submitHfToken', hfToken: token });
+          }
+
+          function cancelHfToken() {
+            const input = document.getElementById('hfTokenInput');
+            if (input) {
+              input.value = '';
+            }
+            vscode.postMessage({ command: 'cancelHfToken' });
+          }
+
+          const hfTokenInput = document.getElementById('hfTokenInput');
+          if (hfTokenInput) {
+            hfTokenInput.addEventListener('keypress', function(e) {
+              if (e.key === 'Enter') {
+                submitHfToken();
+              }
+            });
           }
 
           function cleanupOut() {
