@@ -26,6 +26,18 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
+  /** Escape HTML special characters to prevent injection */
+  private escapeHtml(text: string): string {
+    const map: { [key: string]: string } = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, (m) => map[m]);
+  }
+
   /** Start polling the `out` folder; when it has content, update message and stop polling. */
   private startOutPolling(): void {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -42,7 +54,30 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     this.outPolling = setInterval(() => {
       if (fs.existsSync(outPath) && fs.readdirSync(outPath).length > 0) {
         // Out folder is populated - trace is complete
-        this.traceMessage = "Trace completed. Check the 'out' folder for trace artifacts";
+        // Check if this is trace and prove by looking for the log file
+        const traceAndProveLogPath = path.join(outPath, 'trace_and_prove_output.log');
+        if (fs.existsSync(traceAndProveLogPath)) {
+          // This is trace and prove - extract message from log
+          try {
+            const logContent = fs.readFileSync(traceAndProveLogPath, 'utf8');
+            // Find the last occurrence of "Found"
+            const lastFoundIndex = logContent.lastIndexOf('Found');
+            if (lastFoundIndex !== -1) {
+              // Extract from "Found" to the end of the log
+              const extractedMessage = logContent.substring(lastFoundIndex);
+              this.traceMessage = extractedMessage;
+            } else {
+              // If "Found" not found, use default message
+              this.traceMessage = "Trace completed. Check the 'out' folder for trace artifacts";
+            }
+          } catch (error) {
+            // If we can't read the log, use default message
+            this.traceMessage = "Trace completed. Check the 'out' folder for trace artifacts";
+          }
+        } else {
+          // Regular trace - use default message
+          this.traceMessage = "Trace completed. Check the 'out' folder for trace artifacts";
+        }
         this.updatePanel();
         if (this.outPolling) {
           clearInterval(this.outPolling);
@@ -798,6 +833,7 @@ agent.prove(whole_proof=True)
     // If a trace (or trace+prove) is in progress, show a dedicated tracing screen
     if (this.tracingInProgress) {
       const message = this.traceMessage || '🔄 Tracing repo...';
+      const escapedMessage = this.escapeHtml(message);
       return `
         <html>
         <head>
@@ -815,18 +851,24 @@ agent.prove(whole_proof=True)
               padding: 1rem;
             }
             .trace-message {
-              font-size: 0.9rem;
+              font-size: 0.85rem;
               color: var(--vscode-descriptionForeground);
-              text-align: center;
+              text-align: left;
               padding: 0.75rem 1rem;
               background: var(--vscode-input-background);
               border-radius: 4px;
               border: 1px solid var(--vscode-input-border);
+              white-space: pre-wrap;
+              word-wrap: break-word;
+              max-height: 80vh;
+              overflow-y: auto;
+              width: 100%;
+              box-sizing: border-box;
             }
           </style>
         </head>
         <body>
-          <div class="trace-message">${message}</div>
+          <div class="trace-message">${escapedMessage}</div>
         </body>
         </html>
       `;
