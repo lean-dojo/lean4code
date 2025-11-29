@@ -569,10 +569,10 @@ agent.prove(whole_proof=True)
     const proveScriptPath = path.join(leanDojoPath, 'prove_script.py');
     fs.writeFileSync(proveScriptPath, proveScript);
 
-    // Ensure out folder exists
+    // Use temporary log file location (will be moved to out folder when done)
+    const tempLogFilePath = path.join(tracePath, 'trace_and_prove_output.log');
     const outPath = path.join(root, 'out');
-    fs.mkdirSync(outPath, { recursive: true });
-    const logFilePath = path.join(outPath, 'trace_and_prove_output.log');
+    const finalLogFilePath = path.join(outPath, 'trace_and_prove_output.log');
 
     // For Windows, we need to adjust the commands
     const isWindows = os.platform() === 'win32';
@@ -583,21 +583,23 @@ agent.prove(whole_proof=True)
     
     terminal.sendText(`cd "${leanDojoPath}"`);
     
-    // Run all commands with output redirection to log file
+    // Run all commands with output redirection to temporary log file
+    // After all commands finish (success or failure), create out folder and move log
     if (isWindows) {
       // On Windows, use cmd.exe syntax (venv activation uses batch script)
       // Escape tokens for Windows cmd (escape quotes and special chars)
       const winGithubToken = githubToken.replace(/"/g, '""').replace(/&/g, '^&').replace(/</g, '^<').replace(/>/g, '^>').replace(/\|/g, '^|');
       const winHfToken = hfToken.trim().replace(/"/g, '""').replace(/&/g, '^&').replace(/</g, '^<').replace(/>/g, '^>').replace(/\|/g, '^|');
-      terminal.sendText(`python -m venv .venv > "${logFilePath}" 2>&1`);
-      terminal.sendText(`.venv\\Scripts\\activate && set GITHUB_ACCESS_TOKEN=${winGithubToken} && set HF_TOKEN=${winHfToken} && python -m pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py >> "${logFilePath}" 2>&1`);
+      terminal.sendText(`python -m venv .venv > "${tempLogFilePath}" 2>&1`);
+      terminal.sendText(`.venv\\Scripts\\activate && set GITHUB_ACCESS_TOKEN=${winGithubToken} && set HF_TOKEN=${winHfToken} && python -m pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py >> "${tempLogFilePath}" 2>&1 || echo. && mkdir "${outPath}" 2>nul && move "${tempLogFilePath}" "${finalLogFilePath}" 2>nul || copy "${tempLogFilePath}" "${finalLogFilePath}"`);
     } else {
-      // For Unix-like systems (macOS, Linux) - redirect all output to log file
-      terminal.sendText(`python3 -m venv .venv > "${logFilePath}" 2>&1`);
-      terminal.sendText(`source .venv/bin/activate && export GITHUB_ACCESS_TOKEN='${escapedGithubToken}' && export HF_TOKEN='${escapedHfToken}' && pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py >> "${logFilePath}" 2>&1`);
+      // For Unix-like systems (macOS, Linux) - redirect all output to temporary log file
+      // After commands complete (success or failure), create out folder and move log file
+      terminal.sendText(`python3 -m venv .venv > "${tempLogFilePath}" 2>&1`);
+      terminal.sendText(`source .venv/bin/activate && export GITHUB_ACCESS_TOKEN='${escapedGithubToken}' && export HF_TOKEN='${escapedHfToken}' && pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py >> "${tempLogFilePath}" 2>&1; mkdir -p "${outPath}" && mv "${tempLogFilePath}" "${finalLogFilePath}" || cp "${tempLogFilePath}" "${finalLogFilePath}"`);
     }
 
-    vscode.window.showInformationMessage(`Trace and Prove started. All output will be saved to: ${logFilePath}`);
+    vscode.window.showInformationMessage(`Trace and Prove started. Output will be saved to: ${finalLogFilePath} when complete.`);
   }
 
   private async handleCleanupOut(): Promise<void> {
