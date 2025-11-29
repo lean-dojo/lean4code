@@ -22,8 +22,35 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
   private traceMessage = '';
   private buildDeps = false;
   private waitingForHfToken = false;
+  private outPolling?: NodeJS.Timeout;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
+
+  /** Start polling the `out` folder; when it has content, update message and stop polling. */
+  private startOutPolling(): void {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      return;
+    }
+    const outPath = path.join(root, 'out');
+
+    // Clear any existing polling
+    if (this.outPolling) {
+      clearInterval(this.outPolling);
+    }
+
+    this.outPolling = setInterval(() => {
+      if (fs.existsSync(outPath) && fs.readdirSync(outPath).length > 0) {
+        // Out folder is populated - trace is complete
+        this.traceMessage = "Trace completed. Check the 'out' folder for trace artifacts";
+        this.updatePanel();
+        if (this.outPolling) {
+          clearInterval(this.outPolling);
+          this.outPolling = undefined;
+        }
+      }
+    }, 5000); // Check every 5 seconds
+  }
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this._view = view;
@@ -415,6 +442,11 @@ if __name__ == "__main__":
 
       child.on('close', (code) => {
         this.removeAllGitFolders(root);
+        // Stop any polling
+        if (this.outPolling) {
+          clearInterval(this.outPolling);
+          this.outPolling = undefined;
+        }
         if (code !== 0) {
           vscode.window.showErrorMessage(
             `Trace failed. View full log?`,
@@ -429,6 +461,7 @@ if __name__ == "__main__":
           });
         } else {
           vscode.window.showInformationMessage('✅ Trace completed successfully');
+          this.traceMessage = "Trace completed. Check the 'out' folder for trace artifacts";
           fs.writeFileSync(path.join(root, 'out', 'trace_done.flag'), 'done');
         }
         this.updatePanel();
@@ -461,6 +494,7 @@ if __name__ == "__main__":
     this.tracingInProgress = true;
     this.traceMessage = '🔄 Tracing repo...';
     this.updatePanel();
+    this.startOutPolling();
 
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) {
