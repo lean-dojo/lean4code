@@ -109,9 +109,7 @@ export class GettingStartedPage extends EditorPane {
   
     wrapper.appendChild(document.createElement('h1')).textContent = 'Welcome to Lean4Code';
     addParagraph('Welcome to Lean4Code, the customized code editor designed specifically for Lean 4!', 'p', true);
-  
-    wrapper.appendChild(document.createElement('h2')).textContent = '🚀 Getting started instantly:';
-    addParagraph('To create a new Lean project, click the ∀ symbol on the top right of this page, or hold down Control + Shift + P (Cmd + Shift + P for Mac OS), to create a new Lean project template');
+    addParagraph('To create a new Lean project, click the ∀ symbol on the top right of this page, or hold down Control + Shift + P to create a new Lean project template');
   
     wrapper.appendChild(document.createElement('h2')).textContent = '✨ Features';
     addParagraph('For any valid lean project, click the robot icon on the left to get started with LeanCopilot, the AI theorem proving assistant!');
