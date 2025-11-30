@@ -21,8 +21,71 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
   private tracingInProgress = false;
   private traceMessage = '';
   private buildDeps = false;
+  private waitingForHfToken = false;
+  private outPolling?: NodeJS.Timeout;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
+
+  /** Escape HTML special characters to prevent injection */
+  private escapeHtml(text: string): string {
+    const map: { [key: string]: string } = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, (m) => map[m]);
+  }
+
+  /** Start polling the `out` folder; when it has content, update message and stop polling. */
+  private startOutPolling(): void {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      return;
+    }
+    const outPath = path.join(root, 'out');
+
+    // Clear any existing polling
+    if (this.outPolling) {
+      clearInterval(this.outPolling);
+    }
+
+    this.outPolling = setInterval(() => {
+      if (fs.existsSync(outPath) && fs.readdirSync(outPath).length > 0) {
+        // Out folder is populated - trace is complete
+        // Check if this is trace and prove by looking for the log file
+        const traceAndProveLogPath = path.join(outPath, 'trace_and_prove_output.log');
+        if (fs.existsSync(traceAndProveLogPath)) {
+          // This is trace and prove - extract message from log
+          try {
+            const logContent = fs.readFileSync(traceAndProveLogPath, 'utf8');
+            // Find the last occurrence of "Found"
+            const lastFoundIndex = logContent.lastIndexOf('Found');
+            if (lastFoundIndex !== -1) {
+              // Extract from "Found" to the end of the log
+              const extractedMessage = logContent.substring(lastFoundIndex);
+              this.traceMessage = extractedMessage;
+            } else {
+              // If "Found" not found, use default message
+              this.traceMessage = "Trace completed. Check the 'out' folder for trace artifacts";
+            }
+          } catch (error) {
+            // If we can't read the log, use default message
+            this.traceMessage = "Trace completed. Check the 'out' folder for trace artifacts";
+          }
+        } else {
+          // Regular trace - use default message
+          this.traceMessage = "Trace completed. Check the 'out' folder for trace artifacts";
+        }
+        this.updatePanel();
+        if (this.outPolling) {
+          clearInterval(this.outPolling);
+          this.outPolling = undefined;
+        }
+      }
+    }, 5000); // Check every 5 seconds
+  }
 
   resolveWebviewView(view: vscode.WebviewView): void {
     this._view = view;
@@ -31,13 +94,16 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
     view.webview.onDidReceiveMessage(msg => {
       switch (msg.command) {
-        case 'createProject': this.handleCreateProject(msg.repoUrl, msg.commitHash, msg.projectName, msg.token, msg.leanVersion); break;
+        case 'createProject': this.handleCreateProject(msg.repoUrl, msg.commitHash, msg.projectName, msg.token); break;
         case 'installPython': this.handleInstallPython(); break;
         case 'installLean': this.handleInstallLean(); break;
         case 'runTrace': this.handleRunTrace(); break;
         case 'cleanupOut': this.handleCleanupOut(); break;
         case 'toggleBuildDeps': this.toggleBuildDeps(); break;
         case 'oneClickTrace' : this.oneClickTrace(); break;
+        case 'traceAndProve': this.handleTraceAndProve(); break;
+        case 'submitHfToken': this.handleSubmitHfToken(msg.hfToken); break;
+        case 'cancelHfToken': this.waitingForHfToken = false; this.updatePanel(); break;
       }
     });
   }
@@ -105,7 +171,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     return /^[a-f0-9]{7,40}$/i.test(hash);
   }
 
-  private async handleCreateProject(repoUrl: string, commitHash: string, projectName: string, token: string, leanVersion: string) {
+  private async handleCreateProject(repoUrl: string, commitHash: string, projectName: string, token: string) {
     if (!this.isValidUrl(repoUrl)) {
       vscode.window.showErrorMessage('Please enter a valid GitHub repository URL');
       return;
@@ -123,11 +189,6 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
     if (!token.trim()) {
       vscode.window.showErrorMessage('Please enter a Personal Access Token');
-      return;
-    }
-
-    if (!leanVersion.trim()) {
-      vscode.window.showErrorMessage('Please enter a Lean version');
       return;
     }
 
@@ -157,7 +218,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
       // Note: out folder will be created by the trace function
 
       // Create trace script
-      const traceScript = this.generateTraceScript( repoUrl, commitHash, token.trim(), leanVersion.trim(), cachePath, tmpPath);
+      const traceScript = this.generateTraceScript( repoUrl, commitHash, token.trim(), cachePath, tmpPath);
       fs.writeFileSync(path.join(tracePath, 'trace_repo.py'), traceScript);
 
        // Clone LeanDojo-v2 into the trace subdirectory (run exactly as requested)
@@ -190,7 +251,7 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
     }
   }
 
-  private generateTraceScript( repoUrl: string, commitHash: string, token: string, leanVersion: string, cacheDir: string, tmpDir: string): string {
+  private generateTraceScript( repoUrl: string, commitHash: string, token: string, cacheDir: string, tmpDir: string): string {
     return `import subprocess
 import shutil
 import os
@@ -221,14 +282,19 @@ def write_status(message, status="info"):
 
 def main():
     write_status(f"✅ Using Python: {sys.executable}")
-    write_status(f"✅ Using Lean version: ${leanVersion}")
 
     repo_path = "../repo"
     write_status(f"Using repo folder: {repo_path}")
 
-    # Use the provided Lean version instead of detecting from lean-toolchain
-    lean_version = "${leanVersion}"
-    write_status(f"Using specified Lean version: {lean_version}")
+    # Auto-detect Lean version from lean-toolchain file
+    lean_toolchain_path = os.path.join(repo_path, "lean-toolchain")
+    if os.path.exists(lean_toolchain_path):
+        with open(lean_toolchain_path, "r") as f:
+            lean_version = f.read().strip()
+        write_status(f"Detected Lean version from lean-toolchain: {lean_version}")
+    else:
+        write_status("⚠️ lean-toolchain file not found, using default Lean version")
+        lean_version = "leanprover/lean4:stable"
 
     write_status("Building the repo with lake...")
     subprocess.run(["lake", "build"], cwd=repo_path, check=True)
@@ -387,7 +453,7 @@ if __name__ == "__main__":
     }
 
     this.tracingInProgress = true;
-    this.traceMessage = 'Starting trace...';
+    this.traceMessage = '🔄 Tracing repo...';
     this.updatePanel();
 
     vscode.window.showInformationMessage('Running trace...');
@@ -397,8 +463,6 @@ if __name__ == "__main__":
 
     const tryNextCommand = () => {
       if (currentIndex >= pythonCommands.length) {
-        this.tracingInProgress = false;
-        this.updatePanel();
         vscode.window.showErrorMessage('No Python installation found. Please install Python first.');
         return;
       }
@@ -406,24 +470,18 @@ if __name__ == "__main__":
       const pythonCmd = pythonCommands[currentIndex];
       const child = spawn(pythonCmd, [traceScriptPath], { cwd: tracePath });
 
-      child.stdout.on('data', (data) => {
-        this.traceMessage = data.toString().trim();
-        this.updatePanel();
-      });
-
-      child.stderr.on('data', (data) => {
-        this.traceMessage = data.toString().trim();
-        this.updatePanel();
-      });
-
       child.on('error', () => {
         currentIndex++;
         tryNextCommand();
       });
 
       child.on('close', (code) => {
-        this.tracingInProgress = false;
         this.removeAllGitFolders(root);
+        // Stop any polling
+        if (this.outPolling) {
+          clearInterval(this.outPolling);
+          this.outPolling = undefined;
+        }
         if (code !== 0) {
           vscode.window.showErrorMessage(
             `Trace failed. View full log?`,
@@ -436,10 +494,9 @@ if __name__ == "__main__":
               });
             }
           });
-          this.traceMessage = '❌ Trace failed';
         } else {
           vscode.window.showInformationMessage('✅ Trace completed successfully');
-          this.traceMessage = '✅ Trace completed successfully!';
+          this.traceMessage = "Trace completed. Check the 'out' folder for trace artifacts";
           fs.writeFileSync(path.join(root, 'out', 'trace_done.flag'), 'done');
         }
         this.updatePanel();
@@ -453,6 +510,131 @@ if __name__ == "__main__":
     await this.handleInstallPython();
     await this.handleInstallLean();
     await this.handleRunTrace();
+  }
+
+  private handleTraceAndProve(): void {
+    this.waitingForHfToken = true;
+    this.updatePanel();
+  }
+
+  private async handleSubmitHfToken(hfToken: string): Promise<void> {
+    if (!hfToken || !hfToken.trim()) {
+      vscode.window.showErrorMessage('HuggingFace token is required');
+      this.waitingForHfToken = false;
+      this.updatePanel();
+      return;
+    }
+
+    this.waitingForHfToken = false;
+    this.tracingInProgress = true;
+    this.traceMessage = '🔄 Tracing repo...';
+    this.updatePanel();
+    this.startOutPolling();
+
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      vscode.window.showErrorMessage('No workspace folder open');
+      return;
+    }
+
+    const tracePath = path.join(root, 'trace');
+    const traceScriptPath = path.join(tracePath, 'trace_repo.py');
+
+    if (!fs.existsSync(traceScriptPath)) {
+      vscode.window.showErrorMessage('trace_repo.py not found');
+      return;
+    }
+
+    // Extract URL, commit hash, and GitHub token from trace_repo.py
+    let repoUrl = '';
+    let commitHash = '';
+    let githubToken = '';
+    try {
+      const traceScript = fs.readFileSync(traceScriptPath, 'utf8');
+      const urlMatch = traceScript.match(/LeanGitRepo\("([^"]+)"/);
+      const commitMatch = traceScript.match(/LeanGitRepo\("[^"]+",\s*"([^"]+)"/);
+      const tokenMatch = traceScript.match(/os\.environ\['GITHUB_ACCESS_TOKEN'\] = '([^']+)'/);
+      
+      if (urlMatch) {
+        repoUrl = urlMatch[1];
+      }
+      if (commitMatch) {
+        commitHash = commitMatch[1];
+      }
+      if (tokenMatch) {
+        githubToken = tokenMatch[1];
+      }
+
+      if (!repoUrl || !commitHash) {
+        vscode.window.showErrorMessage('Could not extract repository URL and commit hash from trace_repo.py');
+        return;
+      }
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Failed to read trace_repo.py: ${error.message}`);
+      return;
+    }
+
+    // Save the HF token to workspace state
+    this.context.workspaceState.update('hfToken', hfToken.trim());
+
+    vscode.window.showInformationMessage('Starting Trace and Prove setup...');
+
+    // Get the terminal and run commands
+    const terminal = vscode.window.createTerminal('LeanDojo Trace and Prove');
+    terminal.show();
+
+    // Check if LeanDojo-v2 directory exists in trace folder
+    const leanDojoPath = path.join(tracePath, 'LeanDojo-v2');
+    if (!fs.existsSync(leanDojoPath)) {
+      vscode.window.showErrorMessage('LeanDojo-v2 directory not found. Please run trace first or create a project.');
+      return;
+    }
+
+    // Create the prove script
+    const proveScript = `from lean_dojo_v2.agent import ExternalAgent
+
+url = "${repoUrl}"
+commit = "${commitHash}"
+
+agent = ExternalAgent(model_name="deepseek-ai/DeepSeek-Prover-V2-671B:novita")
+agent.setup_github_repository(url=url, commit=commit)
+agent.prove(whole_proof=True)
+`;
+
+    const proveScriptPath = path.join(leanDojoPath, 'prove_script.py');
+    fs.writeFileSync(proveScriptPath, proveScript);
+
+    // Use temporary log file location (will be moved to out folder when done)
+    const tempLogFilePath = path.join(tracePath, 'trace_and_prove_output.log');
+    const outPath = path.join(root, 'out');
+    const finalLogFilePath = path.join(outPath, 'trace_and_prove_output.log');
+
+    // For Windows, we need to adjust the commands
+    const isWindows = os.platform() === 'win32';
+    
+    // Escape tokens for shell commands
+    const escapedGithubToken = githubToken.replace(/'/g, "'\\''").replace(/"/g, '\\"');
+    const escapedHfToken = hfToken.trim().replace(/'/g, "'\\''").replace(/"/g, '\\"');
+    
+    terminal.sendText(`cd "${leanDojoPath}"`);
+    
+    // Run all commands with output redirection to temporary log file
+    // After all commands finish (success or failure), create out folder and move log
+    if (isWindows) {
+      // On Windows, use cmd.exe syntax (venv activation uses batch script)
+      // Escape tokens for Windows cmd (escape quotes and special chars)
+      const winGithubToken = githubToken.replace(/"/g, '""').replace(/&/g, '^&').replace(/</g, '^<').replace(/>/g, '^>').replace(/\|/g, '^|');
+      const winHfToken = hfToken.trim().replace(/"/g, '""').replace(/&/g, '^&').replace(/</g, '^<').replace(/>/g, '^>').replace(/\|/g, '^|');
+      terminal.sendText(`python -m venv .venv > "${tempLogFilePath}" 2>&1`);
+      terminal.sendText(`.venv\\Scripts\\activate && set GITHUB_ACCESS_TOKEN=${winGithubToken} && set HF_TOKEN=${winHfToken} && python -m pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py >> "${tempLogFilePath}" 2>&1 || echo. && mkdir "${outPath}" 2>nul && move "${tempLogFilePath}" "${finalLogFilePath}" 2>nul || copy "${tempLogFilePath}" "${finalLogFilePath}"`);
+    } else {
+      // For Unix-like systems (macOS, Linux) - redirect all output to temporary log file
+      // After commands complete (success or failure), create out folder and move log file
+      terminal.sendText(`python3 -m venv .venv > "${tempLogFilePath}" 2>&1`);
+      terminal.sendText(`source .venv/bin/activate && export GITHUB_ACCESS_TOKEN='${escapedGithubToken}' && export HF_TOKEN='${escapedHfToken}' && pip install --upgrade pip && pip install -e ".[dev]" && pip install git+https://github.com/stanford-centaur/PyPantograph && pip install torch && pip install torchaudio && pip install torchvision && python prove_script.py >> "${tempLogFilePath}" 2>&1; mkdir -p "${outPath}" && mv "${tempLogFilePath}" "${finalLogFilePath}" || cp "${tempLogFilePath}" "${finalLogFilePath}"`);
+    }
+
+    vscode.window.showInformationMessage(`Trace and Prove started. Output will be saved to: ${finalLogFilePath} when complete.`);
   }
 
   private async handleCleanupOut(): Promise<void> {
@@ -573,9 +755,6 @@ if __name__ == "__main__":
           
           <div class="field-label">Personal Access Token</div>
           <input id="tokenInput" type="password" placeholder="GitHub PAT for unlimited API access" />
-          
-          <div class="field-label">Lean Version</div>
-          <input id="leanVersionInput" type="text" placeholder="e.g., leanprover/lean4:v4.21.0-rc3" />
 
           <button onclick="toggleBuildDeps()">🔁 Toggle build_deps (Currently: ${this.buildDeps ? 'True' : 'False'})</button>
           
@@ -590,15 +769,13 @@ if __name__ == "__main__":
             const repoUrl = document.getElementById('repoInput').value;
             const commitHash = document.getElementById('commitInput').value;
             const token = document.getElementById('tokenInput').value;
-            const leanVersion = document.getElementById('leanVersionInput').value;
             
             vscode.postMessage({ 
               command: 'createProject', 
               projectName: projectName,
               repoUrl: repoUrl,
               commitHash: commitHash,
-              token: token,
-              leanVersion: leanVersion
+              token: token
             });
           }
           
@@ -621,12 +798,6 @@ if __name__ == "__main__":
           });
           
           document.getElementById('tokenInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-              document.getElementById('leanVersionInput').focus();
-            }
-          });
-          
-          document.getElementById('leanVersionInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
               createProject();
             }
@@ -658,6 +829,50 @@ if __name__ == "__main__":
         }
       }
     } catch {}
+
+    // If a trace (or trace+prove) is in progress, show a dedicated tracing screen
+    if (this.tracingInProgress) {
+      const message = this.traceMessage || '🔄 Tracing repo...';
+      const escapedMessage = this.escapeHtml(message);
+      return `
+        <html>
+        <head>
+          <style>
+            body {
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              margin: 0;
+              background: var(--vscode-sideBar-background);
+              color: var(--vscode-sideBar-foreground);
+              font-family: sans-serif;
+              padding: 1rem;
+            }
+            .trace-message {
+              font-size: 0.85rem;
+              color: var(--vscode-descriptionForeground);
+              text-align: left;
+              padding: 0.75rem 1rem;
+              background: var(--vscode-input-background);
+              border-radius: 4px;
+              border: 1px solid var(--vscode-input-border);
+              white-space: pre-wrap;
+              word-wrap: break-word;
+              max-height: 80vh;
+              overflow-y: auto;
+              width: 100%;
+              box-sizing: border-box;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="trace-message">${escapedMessage}</div>
+        </body>
+        </html>
+      `;
+    }
 
     return `
       <html>
@@ -719,14 +934,53 @@ if __name__ == "__main__":
             border-radius: 4px;
             border: 1px solid var(--vscode-input-border);
           }
+          input[type="password"] {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            border: 1px solid var(--vscode-input-border);
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            box-sizing: border-box;
+            margin-bottom: 1rem;
+          }
+          .hf-token-section {
+            display: none;
+            width: 100%;
+            margin-bottom: 1rem;
+          }
+          .hf-token-section.visible {
+            display: block;
+          }
+          .hf-token-label {
+            font-size: 0.75rem;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 0.5rem;
+            text-align: center;
+          }
         </style>
       </head>
       <body>
       <button 
         onclick="oneClickTrace()" 
         id="traceButton" 
-        ${traceAlreadyCompleted ? 'disabled' : ''}>
-        ${traceAlreadyCompleted ? '✅ Trace completed' : '🔧 Click here to trace your repo!'}
+        ${traceAlreadyCompleted ? 'disabled' : ''}
+        ${this.waitingForHfToken ? 'style="display: none;"' : ''}>
+        ${traceAlreadyCompleted ? '✅ Trace completed' : 'Trace ONLY!'}
+      </button>
+
+      <div class="hf-token-section ${this.waitingForHfToken ? 'visible' : ''}" id="hfTokenSection">
+        <div class="hf-token-label">LeanDojo-v2 requires a HuggingFace Personal Access Token</div>
+        <input id="hfTokenInput" type="password" placeholder="Enter your Token" />
+        <button onclick="cancelHfToken()" style="margin-top: 0.5rem;">Cancel</button>
+      </div>
+
+      <button 
+        onclick="traceAndProve()" 
+        id="traceAndProveButton"
+        ${this.waitingForHfToken ? 'style="display: none;"' : ''}>
+        🔬 Trace and Prove
       </button>
 
       <div class="trace-completion-info">
@@ -743,6 +997,41 @@ if __name__ == "__main__":
             button.disabled = true;
             button.innerText = '🔄 Tracing repo...';
             vscode.postMessage({ command: 'oneClickTrace' });
+          }
+
+          function traceAndProve() {
+            vscode.postMessage({ command: 'traceAndProve' });
+            const input = document.getElementById('hfTokenInput');
+            if (input) {
+              setTimeout(() => input.focus(), 100);
+            }
+          }
+
+          function submitHfToken() {
+            const input = document.getElementById('hfTokenInput');
+            if (!input) return;
+            const token = input.value;
+            if (!token || !token.trim()) {
+              return;
+            }
+            vscode.postMessage({ command: 'submitHfToken', hfToken: token });
+          }
+
+          function cancelHfToken() {
+            const input = document.getElementById('hfTokenInput');
+            if (input) {
+              input.value = '';
+            }
+            vscode.postMessage({ command: 'cancelHfToken' });
+          }
+
+          const hfTokenInput = document.getElementById('hfTokenInput');
+          if (hfTokenInput) {
+            hfTokenInput.addEventListener('keypress', function(e) {
+              if (e.key === 'Enter') {
+                submitHfToken();
+              }
+            });
           }
 
           function cleanupOut() {
