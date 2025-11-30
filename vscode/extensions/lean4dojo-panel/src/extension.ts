@@ -959,6 +959,18 @@ agent.prove(whole_proof=True)
             margin-bottom: 0.5rem;
             text-align: center;
           }
+          .trace-option-info {
+            font-size: 0.75rem;
+            color: var(--vscode-descriptionForeground);
+            text-align: left;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: var(--vscode-input-background);
+            border-radius: 4px;
+            border: 1px solid var(--vscode-input-border);
+            line-height: 1.5;
+          }
         </style>
       </head>
       <body>
@@ -967,7 +979,7 @@ agent.prove(whole_proof=True)
         id="traceButton" 
         ${traceAlreadyCompleted ? 'disabled' : ''}
         ${this.waitingForHfToken ? 'style="display: none;"' : ''}>
-        ${traceAlreadyCompleted ? '✅ Trace completed' : 'Trace ONLY!'}
+        ${traceAlreadyCompleted ? '✅ Trace completed' : 'Trace Only'}
       </button>
 
       <div class="hf-token-section ${this.waitingForHfToken ? 'visible' : ''}" id="hfTokenSection">
@@ -980,11 +992,15 @@ agent.prove(whole_proof=True)
         onclick="traceAndProve()" 
         id="traceAndProveButton"
         ${this.waitingForHfToken ? 'style="display: none;"' : ''}>
-        🔬 Trace and Prove
+        Trace and Prove "sorry"s
       </button>
 
       <div class="trace-completion-info">
         Tracing is complete when "out" folder is populated, this may take a few seconds to a few hours...
+      </div>
+
+      <div class="trace-option-info">
+        Choose <strong>Trace Only</strong> if you would like to just trace the repo. Choose <strong>Trace and Prove "sorry"s</strong> if you would like to trace and prove the repo's sorry statements.
       </div>
 
         
