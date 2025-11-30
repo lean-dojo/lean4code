@@ -384,7 +384,7 @@ class LeanCopilotPanel implements vscode.WebviewViewProvider {
         </head>
         <body>
           <h2>🤖 LeanCopilot integrated!</h2>
-          <div class="small">LeanCopilot is now ready to use in your project! Try using either "suggest_tactics_deepseek" or "#statesearch" for theorem proving assistance!</div>
+          <div class="small">LeanCopilot is now ready to use in your project! Try using "suggest_tactics" for theorem proving assistance!</div>
         </body>
         </html>
       `;
