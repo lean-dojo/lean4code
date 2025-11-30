@@ -74,14 +74,13 @@ export async function moduleToContent(resource: URI): Promise<string> {
 // Register the Lean4Code welcome message
 gettingStartedContentRegistry.registerProvider('lean4code_welcome', () => `
 <div style="text-align: left; padding: 1rem; max-width: 100%; margin: auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: white; line-height: 1.4; font-size: 13px;">
-	<h2 style="color: #4FC3F7; margin-bottom: 0.5rem; font-size: 1.1rem;">🚀 Getting started instantly:</h2>
-	<p style="margin-bottom: 0.25rem; font-size: 0.9rem;">To create a new Lean project, click the ∀ symbol on the top right of this page, or hold down Control + Shift + P (Cmd + Shift + P for Mac OS), to create a new Lean project template</p>
+	<p style="margin-bottom: 0.25rem; font-size: 0.9rem;">To create a new Lean project, click the ∀ symbol on the top right of this page, or hold down Control + Shift + P to create a new Lean project template</p>
 
 	<h2 style="color: #4FC3F7; margin-bottom: 0.5rem; font-size: 1.1rem;">✨ Features</h2>
 	<p style="margin-bottom: 0.25rem; font-size: 0.9rem;">For any valid lean project, click the robot icon on the left to get started with LeanCopilot, the AI theorem proving assistant. Simply click "Setup LeanCopilot", and add "import LeanCopilot" to the top of any Lean file to start interacting with LeanCopilot!</p>
 	<p style="margin-bottom: 0.25rem; font-size: 0.85rem;">-Never used LeanCopilot before? Get started here: <a href="https://github.com/lean-dojo/LeanCopilot" style="color: #4FC3F7; text-decoration: underline;" target="_blank">https://github.com/lean-dojo/LeanCopilot</a></p>
 
-	<p style="margin-bottom: 0.25rem; font-size: 0.9rem;">To trace any lean project using LeanDojo, simply click the dojo icon on the left hand panel. Enter a name for the trace, and the url and the most recent commit hash (you can find it on GitHub by clicking the circular clock icon right under the green "code" button for any repo, and then clicking the copy button for any commit) of the repo you want to trace. Then, add in your GitHub personal access token. Finally, paste in the version of Lean the repo to trace is using (i.e., paste in the contents of the repo's "lean-toolchain" file. From there, follow the instructions on the left hand side, and wait for your trace to complete!</p>
+	<p style="margin-bottom: 0.25rem; font-size: 0.9rem;">To trace any lean project using LeanDojo, simply click the dojo icon on the left hand panel. Enter a name for the trace, and the url and the most recent commit hash of the repo you want to trace. Then, add in your GitHub personal access token. From there, follow the instructions on the left hand side, and wait for your trace to complete!</p>
 	<p style="margin-bottom: 0.25rem; font-size: 0.85rem;">-New to LeanDojo? Read up on it here: <a href="https://leandojo.org/" style="color: #4FC3F7; text-decoration: underline;" target="_blank">https://leandojo.org/</a></p>
 
 	<p style="margin-bottom: 0.25rem; font-size: 0.85rem;">We're still working on more tools for Lean4Code, including more integrated LeanDojo features.</p>
