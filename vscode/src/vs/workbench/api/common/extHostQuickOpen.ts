@@ -560,6 +560,7 @@ export function createExtHostQuickOpen(mainContext: IMainContext, workspace: IEx
 		private _selectedItems: T[] = [];
 		private readonly _onDidChangeSelectionEmitter = new Emitter<T[]>();
 		private readonly _onDidTriggerItemButtonEmitter = new Emitter<QuickPickItemButtonEvent<T>>();
+		private _prompt: string | undefined;
 
 		constructor(extension: IExtensionDescription, onDispose: () => void) {
 			super(extension, onDispose);
@@ -569,6 +570,15 @@ export function createExtHostQuickOpen(mainContext: IMainContext, workspace: IEx
 				this._onDidTriggerItemButtonEmitter
 			);
 			this.update({ type: 'quickPick' });
+		}
+
+		get prompt() {
+			return this._prompt;
+		}
+
+		set prompt(prompt: string | undefined) {
+			this._prompt = prompt;
+			this.update({ prompt });
 		}
 
 		get items() {
