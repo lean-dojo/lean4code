@@ -461,32 +461,6 @@ index 0d7f87a..6b72fec 100644
 -  "description": "API tests for VS Code",
 +  "description": "API tests for !!APP_NAME!!",
    "version": "0.0.1",
-diff --git a/extensions/vscode-colorize-tests/package.json b/extensions/vscode-colorize-tests/package.json
-index b416aee..3f60c26 100644
---- a/extensions/vscode-colorize-tests/package.json
-+++ b/extensions/vscode-colorize-tests/package.json
-@@ -2,3 +2,3 @@
-   "name": "vscode-colorize-tests",
--  "description": "Colorize tests for VS Code",
-+  "description": "Colorize tests for !!APP_NAME!!",
-   "version": "0.0.1",
-diff --git a/extensions/vscode-colorize-tests/test/colorize-fixtures/14119.less b/extensions/vscode-colorize-tests/test/colorize-fixtures/14119.less
-index a0006d8..132b67e 100644
---- a/extensions/vscode-colorize-tests/test/colorize-fixtures/14119.less
-+++ b/extensions/vscode-colorize-tests/test/colorize-fixtures/14119.less
-@@ -1,2 +1,2 @@
--#f(@hm: "broken highlighting in VS Code") {
-+#f(@hm: "broken highlighting in !!APP_NAME!!") {
-     content: "";
-diff --git a/extensions/vscode-colorize-tests/test/colorize-results/14119_less.json b/extensions/vscode-colorize-tests/test/colorize-results/14119_less.json
-index 6680753..da1795a 100644
---- a/extensions/vscode-colorize-tests/test/colorize-results/14119_less.json
-+++ b/extensions/vscode-colorize-tests/test/colorize-results/14119_less.json
-@@ -114,3 +114,3 @@
- 	{
--		"c": "broken highlighting in VS Code",
-+		"c": "broken highlighting in !!APP_NAME!!",
- 		"t": "source.css.less meta.selector.less meta.group.less meta.property-value.less string.quoted.double.less",
 diff --git a/extensions/vscode-test-resolver/package.json b/extensions/vscode-test-resolver/package.json
 index 8ab2171..0cd1cfb 100644
 --- a/extensions/vscode-test-resolver/package.json
