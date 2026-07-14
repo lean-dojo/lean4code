@@ -15,9 +15,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 class LeanDojoPanel implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
-  private pythonInstalled = false;
-  private leanDojoInstalled = false;
-  private leanInstalled = false;
   private tracingInProgress = false;
   private traceMessage = '';
   private buildDeps = false;
@@ -194,9 +191,6 @@ class LeanDojoPanel implements vscode.WebviewViewProvider {
 
     try {
       // Reset state
-      this.pythonInstalled = false;
-      this.leanDojoInstalled = false;
-      this.leanInstalled = false;
       this.tracingInProgress = false;
       this.traceMessage = '';
 
@@ -330,7 +324,6 @@ if __name__ == "__main__":
             vscode.window.showErrorMessage(`Failed to install Python: ${error.message}`);
             return;
           }
-          this.pythonInstalled = true;
           vscode.window.showInformationMessage('✅ Python installed successfully');
           setTimeout(() => this.updatePanel(), 1000);
         });
@@ -346,14 +339,12 @@ if __name__ == "__main__":
               vscode.window.showErrorMessage(`Failed to install Python: ${error.message}`);
               return;
             }
-            this.pythonInstalled = true;
             vscode.window.showInformationMessage('✅ Python installed successfully');
             setTimeout(() => this.updatePanel(), 1000);
           });
         });
       } else if (platform === 'win32') {
         vscode.window.showInformationMessage('Please install Python 3.10 from https://www.python.org/downloads/');
-        this.pythonInstalled = true;
         setTimeout(() => this.updatePanel(), 1000);
       } else {
         vscode.window.showErrorMessage(`Unsupported platform: ${platform}`);
@@ -430,7 +421,6 @@ if __name__ == "__main__":
           vscode.window.showErrorMessage(`Failed to set Lean override: ${overrideError.message}`);
           return;
         }
-        this.leanInstalled = true;
         vscode.window.showInformationMessage(`✅ Lean version ${leanVersion} installed successfully`);
         setTimeout(() => this.updatePanel(), 1000);
       });

@@ -16,7 +16,6 @@ class TarsPanel implements vscode.WebviewViewProvider {
   private tarsBooted = false;
   private bootMode = '';
   private talkWithTarsClicked = false;
-  private tarsTerminal?: vscode.Terminal;
   private currentSessionId?: string;
   private tarsOutput?: vscode.OutputChannel;
 
@@ -127,19 +126,6 @@ class TarsPanel implements vscode.WebviewViewProvider {
     }
     const json: any = await res.json();
     this.currentSessionId = json.sessionId;
-  }
-  
-  
-
-  private extractSessionId(output: string): string | null {
-    const sessionIdIndex = output.indexOf('sessionId');
-    if (sessionIdIndex === -1) return null;
-    
-    const startIndex = sessionIdIndex + 11;
-    const endIndex = output.indexOf('"', startIndex);
-    
-    if (endIndex === -1) return null;
-    return output.substring(startIndex, endIndex);
   }
 
   private async handleTalkWithTars(): Promise<void> {
