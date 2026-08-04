@@ -44,8 +44,6 @@ const dirs = [
 	'extensions/typescript-language-features',
 	'remote',
 	'remote/web',
-	'.vscode/extensions/vscode-selfhost-import-aid',
-	'.vscode/extensions/vscode-selfhost-test-provider',
 ];
 
 if (fs.existsSync(`${__dirname}/../../.build/distro/npm`)) {
