@@ -1,0 +1,131 @@
+name: Dependency freshness check
+
+# Checks things that ARE pinned in this repo and reports when a newer
+# version is available upstream. Does NOT auto-update anything, auto-bumping
+# arbitrary versions is how silent breakage happens. This just tells you
+# what's behind so you can decide when to update.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # weekly, same day as build.yml
+  workflow_dispatch: {}
+
+jobs:
+  check-freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: vscode/.nvmrc
+
+      - name: Check vscode-lean4 upstream tag
+        id: lean4ext
+        run: |
+          CURRENT_TAG=$(cat vscode/extensions/lean4-patches/UPSTREAM_TAG.txt 2>/dev/null || echo "unknown")
+          LATEST_TAG=$(git ls-remote --tags --refs https://github.com/leanprover/vscode-lean4.git \
+            | awk -F/ '{print $NF}' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V | tail -1)
+          echo "current=$CURRENT_TAG" >> "$GITHUB_OUTPUT"
+          echo "latest=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+          echo "Current: $CURRENT_TAG"
+          echo "Latest upstream: $LATEST_TAG"
+          if [ "$CURRENT_TAG" != "$LATEST_TAG" ]; then
+            echo "behind=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "behind=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check npm outdated (vscode/)
+        id: npm_vscode
+        working-directory: vscode
+        run: |
+          npm install --package-lock-only 2>&1 | tail -5 || true
+          npm outdated --json > /tmp/outdated-vscode.json 2>/dev/null || true
+          COUNT=$(node -e "try{const d=require('/tmp/outdated-vscode.json');console.log(Object.keys(d).length)}catch(e){console.log(0)}")
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Check npm outdated (vscode/extensions/)
+        id: npm_extensions
+        working-directory: vscode/extensions
+        run: |
+          npm install --package-lock-only 2>&1 | tail -5 || true
+          npm outdated --json > /tmp/outdated-extensions.json 2>/dev/null || true
+          COUNT=$(node -e "try{const d=require('/tmp/outdated-extensions.json');console.log(Object.keys(d).length)}catch(e){console.log(0)}")
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Build report and open/update issue
+        if: steps.lean4ext.outputs.behind == 'true' || steps.npm_vscode.outputs.count != '0' || steps.npm_extensions.outputs.count != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let body = `Dependency freshness check ran on ${new Date().toISOString()}.\n\n`;
+
+            const behind = "${{ steps.lean4ext.outputs.behind }}" === "true";
+            if (behind) {
+              body += `### vscode-lean4 extension\n`;
+              body += `- Currently synced to: \`${{ steps.lean4ext.outputs.current }}\`\n`;
+              body += `- Latest upstream: \`${{ steps.lean4ext.outputs.latest }}\`\n`;
+              body += `- Update with: \`scripts/sync-lean4-extension.sh ${{ steps.lean4ext.outputs.latest }}\`\n\n`;
+            }
+
+            const vscodeCount = "${{ steps.npm_vscode.outputs.count }}";
+            if (vscodeCount !== "0") {
+              body += `### npm packages outdated in vscode/\n`;
+              try {
+                const data = JSON.parse(fs.readFileSync('/tmp/outdated-vscode.json', 'utf8'));
+                for (const [pkg, info] of Object.entries(data)) {
+                  body += `- \`${pkg}\`: ${info.current} → ${info.latest}\n`;
+                }
+              } catch (e) {
+                body += `(${vscodeCount} packages outdated, see workflow log for details)\n`;
+              }
+              body += `\n`;
+            }
+
+            const extCount = "${{ steps.npm_extensions.outputs.count }}";
+            if (extCount !== "0") {
+              body += `### npm packages outdated in vscode/extensions/\n`;
+              try {
+                const data = JSON.parse(fs.readFileSync('/tmp/outdated-extensions.json', 'utf8'));
+                for (const [pkg, info] of Object.entries(data)) {
+                  body += `- \`${pkg}\`: ${info.current} → ${info.latest}\n`;
+                }
+              } catch (e) {
+                body += `(${extCount} packages outdated, see workflow log for details)\n`;
+              }
+              body += `\n`;
+            }
+
+            body += `This is a report only, nothing was changed automatically. Review before bumping, some of these version bumps have broken the build before (see the @types/vscode incident).`;
+
+            const title = "Dependency freshness report";
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: ["dependency-freshness"]
+            });
+
+            if (existing.data.length > 0) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["dependency-freshness"]
+              });
+            }

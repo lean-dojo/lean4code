@@ -1,0 +1,130 @@
+name: LeanDojo-v2 / LeanCopilot integration check
+
+# LeanDojo-v2 and LeanCopilot are NOT version-pinned anywhere in this repo.
+# lean4dojo-panel clones LeanDojo-v2 at whatever HEAD currently is, and
+# leancopilot-panel requires LeanCopilot from git "@ main". This means any
+# breaking change upstream (renamed path, renamed Lake package, changed
+# config format) breaks lean4code for every user immediately, with no
+# warning, since nothing here protects against that drift.
+#
+# This workflow re-checks the specific hardcoded assumptions in
+# lean4dojo-panel and leancopilot-panel against whatever LeanDojo-v2/main
+# and LeanCopilot/main currently look like, weekly, so you find out from
+# a GitHub issue instead of from a user's bug report.
+#
+# IMPORTANT: the path/string checks below are only as good as they are kept
+# in sync with the actual source. If you change what lean4dojo-panel or
+# leancopilot-panel hardcode, update the corresponding check here too.
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch: {}
+
+jobs:
+  check-leandojo-v2:
+    runs-on: ubuntu-latest
+    outputs:
+      external_api_ok: ${{ steps.check.outputs.external_api_ok }}
+      latest_commit: ${{ steps.check.outputs.latest_commit }}
+    steps:
+      - name: Clone LeanDojo-v2 at current HEAD
+        run: git clone --depth 1 https://github.com/lean-dojo/LeanDojo-v2 /tmp/LeanDojo-v2
+
+      - name: Verify the path leancopilot-panel hardcodes still exists
+        id: check
+        run: |
+          # This mirrors: leancopilot-panel/src/extension.ts:157
+          #   path.join(projectPath, 'LeanDojo-v2', 'lean_dojo_v2', 'external_api')
+          if [ -d "/tmp/LeanDojo-v2/lean_dojo_v2/external_api" ]; then
+            echo "external_api_ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "external_api_ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::LeanDojo-v2/lean_dojo_v2/external_api no longer exists at this path. leancopilot-panel hardcodes this path and will break."
+          fi
+          cd /tmp/LeanDojo-v2
+          echo "latest_commit=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+  check-leancopilot:
+    runs-on: ubuntu-latest
+    outputs:
+      lakefile_ok: ${{ steps.check.outputs.lakefile_ok }}
+      latest_commit: ${{ steps.check.outputs.latest_commit }}
+    steps:
+      - name: Clone LeanCopilot at current main
+        run: git clone --depth 1 --branch main https://github.com/lean-dojo/LeanCopilot.git /tmp/LeanCopilot
+
+      - name: Verify it still looks like a Lake package named LeanCopilot
+        id: check
+        run: |
+          # This mirrors: leancopilot-panel/src/extension.ts:61-62
+          #   name = "LeanCopilot"
+          #   git = "https://github.com/lean-dojo/LeanCopilot.git"
+          if [ -f "/tmp/LeanCopilot/lakefile.toml" ] || [ -f "/tmp/LeanCopilot/lakefile.lean" ]; then
+            echo "lakefile_ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "lakefile_ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::LeanCopilot no longer has a lakefile.toml or lakefile.lean at its root. leancopilot-panel's generated require block may be building against a package structure that changed."
+          fi
+          cd /tmp/LeanCopilot
+          echo "latest_commit=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Check the download command still resolves as a known lake target
+        run: |
+          # This mirrors: leancopilot-panel/src/extension.ts:122
+          #   lake exe LeanCopilot/download
+          # Best-effort text search since a full lake build here is heavy for CI.
+          if ! grep -rq "download" /tmp/LeanCopilot/lakefile.toml /tmp/LeanCopilot/lakefile.lean 2>/dev/null; then
+            echo "::warning::Could not find a 'download' target referenced in LeanCopilot's lakefile. 'lake exe LeanCopilot/download' may no longer work."
+          fi
+
+  report:
+    needs: [check-leandojo-v2, check-leancopilot]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open or update tracking issue if anything broke
+        if: needs.check-leandojo-v2.outputs.external_api_ok == 'false' || needs.check-leancopilot.outputs.lakefile_ok == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let body = `Upstream integration check ran on ${new Date().toISOString()}.\n\n`;
+            body += `LeanDojo-v2 latest commit checked: \`${{ needs.check-leandojo-v2.outputs.latest_commit }}\`\n`;
+            body += `LeanCopilot latest commit checked: \`${{ needs.check-leancopilot.outputs.latest_commit }}\`\n\n`;
+
+            if ("${{ needs.check-leandojo-v2.outputs.external_api_ok }}" === "false") {
+              body += `⚠️ **LeanDojo-v2/lean_dojo_v2/external_api no longer exists.**\n`;
+              body += `leancopilot-panel/src/extension.ts hardcodes this path (line ~157). It needs updating to match LeanDojo-v2's current structure.\n\n`;
+            }
+
+            if ("${{ needs.check-leancopilot.outputs.lakefile_ok }}" === "false") {
+              body += `⚠️ **LeanCopilot's repo structure changed** (no lakefile.toml/lakefile.lean found at root).\n`;
+              body += `leancopilot-panel/src/extension.ts's generated \`require LeanCopilot\` block (line ~86) may no longer produce a working config.\n\n`;
+            }
+
+            body += `Since neither LeanDojo-v2 nor LeanCopilot are version-pinned, this can start affecting real users immediately once it happens upstream. Treat this as higher priority than the dependency-freshness report.`;
+
+            const title = "LeanDojo-v2 / LeanCopilot integration check failed";
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: ["upstream-integration"]
+            });
+
+            if (existing.data.length > 0) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["upstream-integration"]
+              });
+            }

@@ -1,0 +1,98 @@
+name: Build check
+
+# Catches build rot before someone discovers it by hand.
+# Runs a full, clean build from scratch: fresh checkout, fresh npm install,
+# no cached node_modules, exactly what a new contributor (or you, next
+# summer) would hit.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Every Monday at 09:00 UTC. Adjust to taste.
+    - cron: '0 9 * * 1'
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
+
+jobs:
+  build-macos-arm64:
+    # macOS runner because gulp's vscode-darwin-arm64 target and the native
+    # module rebuilds are platform-specific. GitHub's macos-14 runners are
+    # Apple Silicon, matching your dev machine.
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read Node version from .nvmrc
+        id: nvmrc
+        run: echo "node_version=$(cat vscode/.nvmrc)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.nvmrc.outputs.node_version }}
+
+      - name: npm install (root, cascades through preinstall/postinstall)
+        working-directory: vscode
+        run: npm install
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: Build (gulp vscode-darwin-arm64)
+        working-directory: vscode
+        run: npx gulp vscode-darwin-arm64
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+      - name: Confirm packaged app exists
+        run: |
+          APP_PATH=$(find vscode/.build -maxdepth 3 -iname "*.app" | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::No .app bundle found after build. Packaging silently failed."
+            exit 1
+          fi
+          echo "Found packaged app at: $APP_PATH"
+
+  notify-on-failure:
+    needs: build-macos-arm64
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open or update a tracking issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "Build check failed";
+            const body = [
+              `The weekly/on-push build check failed on ${new Date().toISOString()}.`,
+              ``,
+              `See the failed run for details: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              ``,
+              `This usually means a dependency drifted (npm package, @types/vscode, etc.) or an upstream file this repo depends on changed. Check the run log's failing step first.`
+            ].join("\n");
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: ["build-failure"]
+            });
+
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["build-failure"]
+              });
+            }
