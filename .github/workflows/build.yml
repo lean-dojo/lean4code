@@ -39,12 +39,23 @@ jobs:
         run: npm install
         env:
           NODE_OPTIONS: --max-old-space-size=8192
+          # Several packages (@vscode/ripgrep, @parcel/watcher, etc.) download
+          # prebuilt binaries from api.github.com during postinstall.
+          # Unauthenticated requests to that API are rate-limited hard (60/hr)
+          # and GitHub Actions runners share IP pools that often exceed it,
+          # causing 403s. Passing the built-in GITHUB_TOKEN authenticates
+          # those requests and raises the limit dramatically.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build (gulp vscode-darwin-arm64)
         working-directory: vscode
         run: npx gulp vscode-darwin-arm64
         env:
           NODE_OPTIONS: --max-old-space-size=8192
+          # Same rate-limit reasoning as the install step above: this stage
+          # downloads marketplace extensions directly from GitHub and
+          # re-runs npm install inside several extension subfolders.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Confirm packaged app exists
         run: |
