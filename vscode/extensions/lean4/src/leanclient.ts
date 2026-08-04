@@ -4,12 +4,15 @@ import {
     DocumentHighlight,
     DocumentHighlightKind,
     EventEmitter,
+    FileSystemWatcher,
     OutputChannel,
     Progress,
     ProgressLocation,
     ProgressOptions,
     Range,
+    RelativePattern,
     window,
+    workspace,
     WorkspaceFolder,
 } from 'vscode'
 import {
@@ -32,18 +35,21 @@ import {
     LeanDiagnostic,
     LeanFileProgressParams,
     LeanFileProgressProcessingInfo,
+    LeanServerCapabilities,
     ServerStoppedReason,
 } from '@leanprover/infoview-api'
 import {
-    getElaborationDelay,
+    allowedLoggingMethods,
+    disallowedLoggingMethods,
     getFallBackToStringOccurrenceHighlighting,
+    isLoggingEnabled,
+    loggingDir,
     serverArgs,
-    serverLoggingEnabled,
-    serverLoggingPath,
     shouldAutofocusOutput,
 } from './config'
 import { logger } from './utils/logger'
 // @ts-ignore
+import * as fs from 'fs'
 import { SemVer } from 'semver'
 import { formatCommandExecutionOutput } from './utils/batch'
 import {
@@ -54,21 +60,41 @@ import {
     LeanModuleHierarchyImportsParams,
     LeanPrepareModuleHierarchyParams,
     LeanPublishDiagnosticsParams,
-    LeanServerCapabilities,
     p2cConverter,
     patchConverters,
     setDependencyBuildMode,
 } from './utils/converters'
 import { elanInstalledToolchains } from './utils/elan'
-import { ExtUri, parseExtUri, toExtUri } from './utils/exturi'
+import { ExtUri, FileUri, parseExtUri, toExtUri } from './utils/exturi'
+import { fileExists } from './utils/fsHelper'
 import { leanRunner } from './utils/leanCmdRunner'
 import { lean, LeanDocument } from './utils/leanEditorProvider'
 import {
     displayNotification,
+    displayNotificationWithInput,
     displayNotificationWithOptionalInput,
     displayNotificationWithOutput,
 } from './utils/notifs'
-import { willUseLakeServer } from './utils/projectInfo'
+import { lakefileLeanUri, lakefileTomlUri, leanToolchainUri, willUseLakeServer } from './utils/projectInfo'
+
+interface LogConfig {
+    logDir?: string | undefined
+    allowedMethods?: string[] | undefined
+    disallowedMethods?: string[] | undefined
+}
+
+function logConfig(): LogConfig | undefined {
+    if (!isLoggingEnabled()) {
+        return undefined
+    }
+    const allowedMethods = allowedLoggingMethods()
+    const disallowedMethods = disallowedLoggingMethods()
+    return {
+        logDir: loggingDir(),
+        allowedMethods: allowedMethods.length > 0 ? allowedMethods : undefined,
+        disallowedMethods: disallowedMethods.length > 0 ? disallowedMethods : undefined,
+    }
+}
 
 interface LeanClientCapabilties {
     silentDiagnosticSupport?: boolean | undefined
@@ -105,6 +131,7 @@ export class LeanClient implements Disposable {
     private showingRestartMessage: boolean = false
     private isRestarting: boolean = false
     private staleDepNotifier: Disposable | undefined
+    private configFileContents: Map<string, string> = new Map()
 
     private openServerDocuments: Set<string> = new Set<string>()
 
@@ -145,10 +172,113 @@ export class LeanClient implements Disposable {
     private serverFailedEmitter = new EventEmitter<string>()
     serverFailed = this.serverFailedEmitter.event
 
-    constructor(folderUri: ExtUri, outputChannel: OutputChannel) {
-        this.outputChannel = outputChannel
-        this.folderUri = folderUri
-        this.subscriptions.push(new Disposable(() => this.staleDepNotifier?.dispose()))
+    static async init(folderUri: ExtUri, outputChannel: OutputChannel): Promise<LeanClient> {
+        const c = new LeanClient()
+        c.outputChannel = outputChannel
+        c.folderUri = folderUri
+        c.subscriptions.push(new Disposable(() => c.staleDepNotifier?.dispose()))
+        await c.registerRestartServerNotificationWatchers()
+        return c
+    }
+
+    private async updateConfigFileContents(uri: FileUri): Promise<boolean> {
+        let contents: string
+        try {
+            contents = (await fs.promises.readFile(uri.fsPath, { encoding: 'utf8' })).trim()
+        } catch {
+            return false
+        }
+        const oldContents = this.configFileContents.get(uri.toString())
+        const isFirstUpdate = oldContents === undefined
+        if (isFirstUpdate || oldContents !== contents) {
+            this.configFileContents.set(uri.toString(), contents)
+            return !isFirstUpdate
+        }
+        return false
+    }
+
+    private async registerRestartServerNotificationWatchers() {
+        const folderUri = this.folderUri
+        if (folderUri.scheme === 'untitled') {
+            return
+        }
+        const watchers: { name: string; watcher: FileSystemWatcher }[] = []
+        if (await fileExists(leanToolchainUri(folderUri).fsPath)) {
+            watchers.push({
+                name: 'Project Lean version (`lean-toolchain`)',
+                watcher: workspace.createFileSystemWatcher(
+                    // Hack: We want to avoid having to escape globs and an empty glob doesn't match the file,
+                    // so we instead watch for `*` relative to `leanToolchainUri(folderUri)`
+                    // (accepting some unlikely false-positives).
+                    new RelativePattern(leanToolchainUri(folderUri).asUri(), '*'),
+                    true,
+                    false,
+                    true,
+                ),
+            })
+            await this.updateConfigFileContents(leanToolchainUri(folderUri))
+        }
+        if (await fileExists(lakefileLeanUri(folderUri).fsPath)) {
+            watchers.push({
+                name: 'Project configuration (`lakefile.lean`)',
+                watcher: workspace.createFileSystemWatcher(
+                    new RelativePattern(lakefileLeanUri(folderUri).asUri(), '*'),
+                    true,
+                    false,
+                    true,
+                ),
+            })
+            await this.updateConfigFileContents(lakefileLeanUri(folderUri))
+        }
+        if (await fileExists(lakefileTomlUri(folderUri).fsPath)) {
+            watchers.push({
+                name: 'Project configuration (`lakefile.toml`)',
+                watcher: workspace.createFileSystemWatcher(
+                    new RelativePattern(lakefileTomlUri(folderUri).asUri(), '*'),
+                    true,
+                    false,
+                    true,
+                ),
+            })
+            await this.updateConfigFileContents(lakefileTomlUri(folderUri))
+        }
+        this.subscriptions.push(...watchers.map(w => w.watcher))
+        let isWatcherNotificationDisplayed = false
+        for (const w of watchers) {
+            this.subscriptions.push(
+                w.watcher.onDidChange(async uri => {
+                    const fileUri = FileUri.fromUri(uri)
+                    if (fileUri === undefined) {
+                        return
+                    }
+                    const didReallyChange = await this.updateConfigFileContents(fileUri)
+                    if (!didReallyChange) {
+                        // In core on ext4, building touches the metadata of the file, which causes
+                        // the change event to trigger.
+                        // VS Code file watchers can't distinguish between "modify" and "change",
+                        // so we use the file contents to distinguish the two post-hoc.
+                        return
+                    }
+                    if (isWatcherNotificationDisplayed) {
+                        return
+                    }
+                    isWatcherNotificationDisplayed = true
+                    displayNotificationWithOptionalInput(
+                        'Information',
+                        `${w.name} of '${folderUri.baseName()}' has changed. Do you wish to restart the Lean server?`,
+                        [
+                            {
+                                input: 'Restart Server',
+                                action: async () => await this.restart(),
+                            },
+                        ],
+                        () => {
+                            isWatcherNotificationDisplayed = false
+                        },
+                    )
+                }),
+            )
+        }
     }
 
     dispose(): void {
@@ -160,6 +290,7 @@ export class LeanClient implements Disposable {
         return this.client?.initializeResult?.capabilities
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     leanServerCapabilities(): LeanServerCapabilities | undefined {
         return this.serverCapabilities()?.experimental
     }
@@ -305,6 +436,7 @@ export class LeanClient implements Disposable {
             context: 'Server Startup',
             cwdUri,
             toolchainUpdateMode: 'PromptAboutUpdate',
+            waitingPrompt: 'Fetching Lean version information',
         })
 
         if (toolchainDecision.kind === 'Error') {
@@ -472,23 +604,24 @@ export class LeanClient implements Disposable {
         ])
     }
 
-    async withStoppedClient(action: () => Promise<void>): Promise<'Success' | 'IsRestarting'> {
+    async withStoppedClient<T>(
+        action: () => Promise<T>,
+    ): Promise<{ kind: 'Success'; result: T } | { kind: 'IsRestarting' }> {
         if (this.isRestarting) {
-            return 'IsRestarting'
+            return { kind: 'IsRestarting' }
         }
         this.isRestarting = true // Ensure that client cannot be restarted in the mean-time
+        let result: T
         try {
             if (this.isStarted()) {
                 await this.stop()
             }
-
-            await action()
+            result = await action()
         } finally {
             this.isRestarting = false
         }
-
         await this.restart()
-        return 'Success'
+        return { kind: 'Success', result }
     }
 
     isInFolderManagedByThisClient(uri: ExtUri): boolean {
@@ -614,10 +747,6 @@ export class LeanClient implements Disposable {
 
     private async determineServerOptions(toolchainOverride: string | undefined): Promise<Executable> {
         const env = Object.assign({}, process.env)
-        if (serverLoggingEnabled()) {
-            env.LEAN_SERVER_LOG_DIR = serverLoggingPath()
-        }
-
         const [serverExecutable, options] = await this.determineExecutable()
         if (toolchainOverride) {
             options.unshift('+' + toolchainOverride)
@@ -672,8 +801,8 @@ export class LeanClient implements Disposable {
             documentSelector: [documentSelector],
             workspaceFolder,
             initializationOptions: {
-                editDelay: getElaborationDelay(),
                 hasWidgets: true,
+                logCfg: logConfig(),
             },
             connectionOptions: {
                 maxRestartCount: 0,
@@ -775,6 +904,28 @@ export class LeanClient implements Disposable {
                     }
 
                     return highlights
+                },
+
+                provideRenameEdits: async (document, position, newName, token, next) => {
+                    const edit = await next(document, position, newName, token)
+                    if (!edit) {
+                        return edit
+                    }
+                    const entries = edit.entries()
+                    const amountFiles = entries.length
+                    if (amountFiles <= 1) {
+                        return edit
+                    }
+                    const amountEdits = entries.map(([_, edits]) => edits.length).reduce((acc, n) => acc + n, 0)
+                    const choice = await displayNotificationWithInput(
+                        'Warning',
+                        `This rename operation will rename ${amountEdits} occurrences in ${amountFiles} files. Do you wish to proceed?`,
+                        ['Proceed'],
+                    )
+                    if (choice === undefined) {
+                        return undefined
+                    }
+                    return edit
                 },
             },
         }

@@ -35,7 +35,7 @@ export type LakeAvailabilityResult =
 export type ElanDumpStateWithoutNetQueryResult = ElanDumpStateWithoutNetResult | { kind: 'PreEagerResolutionVersion' }
 export type ElanDumpStateWithNetQueryResult = ElanDumpStateWithNetResult | { kind: 'PreEagerResolutionVersion' }
 
-const recommendedElanVersion = new SemVer('3.1.1')
+const recommendedElanVersion = new SemVer('4.0.0')
 // Should be bumped in a release *before* we bump the version requirement of the VS Code extension so that
 // users know that they need to update and do not get stuck on an old VS Code version.
 const recommendedVSCodeVersion = new SemVer('1.75.0')
@@ -177,8 +177,47 @@ export class SetupDiagnoser {
     }
 
     async checkGitAvailable(): Promise<boolean> {
+        if (os.type() === 'Darwin') {
+            // On macOS, if Git isn't installed, `git --version` creates a GUI dialog for installing Apple Command Line Tools.
+            // To avoid this, we check the installation location to determine which of the following two states the system is in:
+            // 1. Git has been installed from somewhere that isn't Apple Command Line Tools (e.g. `brew`)
+            // 2. Git has not been installed or Git has been installed through Apple Command Line Tools
+            // Then, in the second case, we also check whether Apple Command Line Tools is installed via `xcode-select --print-path` to decide
+            // whether Git has not been installed or whether Git has been installed through Apple Command Line Tools.
+            const whichResult = await this.runSilently('which', ['git'])
+            if (whichResult.exitCode !== ExecutionExitCode.Success) {
+                return false
+            }
+            const gitPath = whichResult.stdout
+            const isNonACLTInstall = gitPath !== '/usr/bin/git'
+            if (isNonACLTInstall) {
+                return true
+            }
+            const xcodeSelectPrintPathResult = await this.runSilently('xcode-select', ['--print-path'])
+            return xcodeSelectPrintPathResult.exitCode === ExecutionExitCode.Success
+        }
         const gitVersionResult = await this.runSilently('git', ['--version'])
         return gitVersionResult.exitCode === ExecutionExitCode.Success
+    }
+
+    async checkDnfAvailable(): Promise<boolean> {
+        const dnfResult = await this.runSilently('dnf', ['--version'])
+        return dnfResult.exitCode === ExecutionExitCode.Success
+    }
+
+    async checkAptGetAvailable(): Promise<boolean> {
+        const aptResult = await this.runSilently('apt-get', ['--version'])
+        return aptResult.exitCode === ExecutionExitCode.Success
+    }
+
+    async checkPkExecAvailable(): Promise<boolean> {
+        const pkExecVersionResult = await this.runSilently('pkexec', ['--version'])
+        return pkExecVersionResult.exitCode === ExecutionExitCode.Success
+    }
+
+    async checkWinGetAvailable(): Promise<boolean> {
+        const winGetVersionResult = await this.runSilently('winget', ['--version'])
+        return winGetVersionResult.exitCode === ExecutionExitCode.Success
     }
 
     async checkLakeAvailable(): Promise<LakeAvailabilityResult> {

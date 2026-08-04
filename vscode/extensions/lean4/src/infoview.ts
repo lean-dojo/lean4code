@@ -41,6 +41,7 @@ import {
     getInfoViewHideInstanceAssumptions,
     getInfoViewHideLetValues,
     getInfoViewHideTypeAssumptions,
+    getInfoViewMessageOrder,
     getInfoViewReverseTacticState,
     getInfoViewShowGoalNames,
     getInfoViewShowTooltipOnHover,
@@ -181,6 +182,9 @@ export class InfoProvider implements Disposable {
             await workspace
                 .getConfiguration('lean4.infoview')
                 .update('showTooltipOnHover', config.showTooltipOnHover, ConfigurationTarget.Global)
+            await workspace
+                .getConfiguration('lean4.infoview')
+                .update('messageOrder', config.messageOrder, ConfigurationTarget.Global)
         },
         sendClientRequest: async (uri: string, method: string, params: any): Promise<any> => {
             const extUri = parseExtUri(uri)
@@ -386,9 +390,7 @@ export class InfoProvider implements Disposable {
                 this.updateStylesheet()
                 await this.sendConfig()
             }),
-            workspace.onDidChangeTextDocument(async () => {
-                await this.sendPosition()
-            }),
+            lean.onDidChangeLeanDocument(() => this.sendPosition()),
             lean.registerLeanEditorCommand('lean4.displayGoal', leanEditor => this.openPreview(leanEditor)),
             commands.registerCommand('lean4.toggleInfoview', () => this.toggleInfoview()),
             lean.registerLeanEditorCommand('lean4.displayList', async leanEditor => {
@@ -446,6 +448,18 @@ export class InfoProvider implements Disposable {
                     id: args.unpauseAllMessagesId,
                 }),
             ),
+            commands.registerCommand('lean4.infoview.copyState', args =>
+                this.webviewPanel?.api.clickedContextMenu({
+                    entry: 'copyState',
+                    id: args.copyStateId,
+                }),
+            ),
+            commands.registerCommand('lean4.infoview.copyMessage', args =>
+                this.webviewPanel?.api.clickedContextMenu({
+                    entry: 'copyMessage',
+                    id: args.copyMessageId,
+                }),
+            ),
             commands.registerCommand('lean4.infoview.goToPinnedLocation', args =>
                 this.webviewPanel?.api.clickedContextMenu({
                     entry: 'goToPinnedLocation',
@@ -456,6 +470,18 @@ export class InfoProvider implements Disposable {
                 this.webviewPanel?.api.clickedContextMenu({
                     entry: 'goToMessageLocation',
                     id: args.goToMessageLocationId,
+                }),
+            ),
+            commands.registerCommand('lean4.infoview.hideTraceSearch', args =>
+                this.webviewPanel?.api.clickedContextMenu({
+                    entry: 'hideTraceSearch',
+                    id: args.hideTraceSearchId,
+                }),
+            ),
+            commands.registerCommand('lean4.infoview.showTraceSearch', args =>
+                this.webviewPanel?.api.clickedContextMenu({
+                    entry: 'showTraceSearch',
+                    id: args.showTraceSearchId,
                 }),
             ),
             commands.registerCommand('lean4.infoview.displayTargetBeforeAssumptions', args =>
@@ -745,7 +771,7 @@ export class InfoProvider implements Disposable {
         } else {
             displayNotification(
                 'Error',
-                'No active Lean editor tab. Make sure to focus the Lean editor tab for which you want to open the infoview.',
+                'No active Lean editor tab. Make sure to focus the Lean editor tab for which you wish to open the infoview.',
             )
         }
     }
@@ -842,6 +868,7 @@ export class InfoProvider implements Disposable {
             hideInaccessibleAssumptions: getInfoViewHideInaccessibleAssumptions(),
             hideLetValues: getInfoViewHideLetValues(),
             showTooltipOnHover: getInfoViewShowTooltipOnHover(),
+            messageOrder: getInfoViewMessageOrder(),
         })
     }
 

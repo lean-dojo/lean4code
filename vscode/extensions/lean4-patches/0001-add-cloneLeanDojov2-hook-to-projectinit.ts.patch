@@ -1,0 +1,39 @@
+From: lean4code-build <build@lean4code.local>
+Subject: [PATCH] add cloneLeanDojov2 hook to projectinit.ts
+
+---
+ src/projectinit.ts | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/src/projectinit.ts b/src/projectinit.ts
+index 1234567..89abcde 100644
+--- a/src/projectinit.ts
++++ b/src/projectinit.ts
+@@ -229,6 +229,32 @@
+         }
+     }
+
++    private async cloneLeanDojov2(projectFolder: FileUri): Promise<void> {
++        try {
++            const leanDojov2Path = projectFolder.join('LeanDojo-v2')
++            this.channel.appendLine(`Cloning LeanDojo-v2 repository to ${leanDojov2Path.fsPath}...`)
++            
++            const result = await batchExecute(
++                'git',
++                ['clone', 'https://github.com/lean-dojo/LeanDojo-v2', leanDojov2Path.fsPath],
++                projectFolder.fsPath,
++                { combined: this.channel }
++            )
++            
++            if (result.exitCode === ExecutionExitCode.Success) {
++                this.channel.appendLine('Successfully cloned LeanDojo-v2 repository.')
++            } else {
++                this.channel.appendLine('Warning: Failed to clone LeanDojo-v2 repository.')
++            }
++        } catch (error) {
++            this.channel.appendLine(`Warning: Error cloning LeanDojo-v2 repository: ${error}`)
++        }
++    }
++
+--
+2.39.0

@@ -6,7 +6,6 @@ import { LeanClient } from '../leanclient'
 import { LeanPublishDiagnosticsParams } from './converters'
 import { ExtUri, FileUri } from './exturi'
 import { lean } from './leanEditorProvider'
-import { LeanInstaller } from './leanInstaller'
 import { logger } from './logger'
 import { displayNotification } from './notifs'
 import { findLeanProjectRootInfo, willUseLakeServer } from './projectInfo'
@@ -43,7 +42,6 @@ async function checkLean4ProjectPreconditions(
 export class LeanClientProvider implements Disposable {
     private subscriptions: Disposable[] = []
     private outputChannel: OutputChannel
-    private installer: LeanInstaller
     private clients: Map<string, LeanClient> = new Map()
     private pending: Map<string, boolean> = new Map()
     private pendingInstallChanged: FileUri[] = []
@@ -65,12 +63,8 @@ export class LeanClientProvider implements Disposable {
     private clientStoppedEmitter = new EventEmitter<[LeanClient, boolean, ServerStoppedReason]>()
     clientStopped = this.clientStoppedEmitter.event
 
-    constructor(installer: LeanInstaller, outputChannel: OutputChannel) {
+    constructor(outputChannel: OutputChannel) {
         this.outputChannel = outputChannel
-        this.installer = installer
-
-        // we must setup the installChanged event handler first before any didOpenEditor calls.
-        this.subscriptions.push(installer.installChanged(async (uri: FileUri) => await this.onInstallChanged(uri)))
 
         lean.visibleLeanEditors.forEach(e => this.ensureClient(e.documentExtUri))
 
@@ -87,7 +81,7 @@ export class LeanClientProvider implements Disposable {
             commands.registerCommand('lean4.restartFile', () => this.restartActiveFile()),
             commands.registerCommand('lean4.refreshFileDependencies', () => this.restartActiveFile()),
             commands.registerCommand('lean4.restartServer', () => this.restartActiveClient()),
-            commands.registerCommand('lean4.stopServer', () => this.stopClient(undefined)),
+            commands.registerCommand('lean4.stopServer', () => this.stopActiveClient()),
         )
 
         this.subscriptions.push(lean.onDidOpenLeanDocument(document => this.ensureClient(document.extUri)))
@@ -146,39 +140,40 @@ export class LeanClientProvider implements Disposable {
         if (doc === undefined) {
             displayNotification(
                 'Error',
-                'No active Lean editor tab. Make sure to focus the Lean editor tab for which you want to issue a restart.',
+                'No active Lean editor tab. Make sure to focus the Lean editor tab for which you wish to issue a restart.',
             )
             return
         }
         this.restartFile(doc.extUri)
     }
 
-    private async stopClient(folderUri: ExtUri | undefined) {
-        let clientToStop: LeanClient
-        if (folderUri === undefined) {
-            if (this.activeClient === undefined) {
-                displayNotification('Error', 'Cannot stop language server: No active client.')
-                return
-            }
-            clientToStop = this.activeClient
-        } else {
-            const foundClient = this.getClientForFolder(folderUri)
-            if (foundClient === undefined) {
-                displayNotification(
-                    'Error',
-                    `Cannot stop language server: No client for project at '${folderUri.toString()}'.`,
-                )
-                return
-            }
-            clientToStop = foundClient
+    private async stopActiveClient() {
+        const client = this.activeClient
+        if (client === undefined) {
+            displayNotification('Error', 'Cannot stop language server: No active client.')
+            return
         }
-        if (clientToStop.isStarted()) {
-            await clientToStop.stop()
+        if (client.isStarted()) {
+            await client.stop()
         }
-        const key = clientToStop.folderUri.toString()
+    }
+
+    private async eraseClient(folderUri: ExtUri) {
+        const client = this.getClientForFolder(folderUri)
+        if (client === undefined) {
+            displayNotification(
+                'Error',
+                `Cannot stop language server: No client for project at '${folderUri.toString()}'.`,
+            )
+            return
+        }
+        if (client.isStarted()) {
+            await client.stop()
+        }
+        const key = client.folderUri.toString()
         this.clients.delete(key)
         this.pending.delete(key)
-        if (clientToStop === this.activeClient) {
+        if (client === this.activeClient) {
             this.activeClient = undefined
         }
     }
@@ -189,7 +184,7 @@ export class LeanClientProvider implements Disposable {
             if (activeUri === undefined) {
                 displayNotification(
                     'Error',
-                    'Cannot restart server: No focused Lean tab. Please focus the Lean tab for which you want to restart the server.',
+                    'Cannot restart server: No focused Lean tab. Please focus the Lean tab for which you wish to restart the server.',
                 )
                 return
             }
@@ -232,6 +227,26 @@ export class LeanClientProvider implements Disposable {
         return Array.from(this.clients.values())
     }
 
+    withStoppedClients<T>(
+        action: () => Promise<T>,
+    ): Promise<{ kind: 'Success'; result: T } | { kind: 'IsRestarting' }> {
+        let combinedAction: () => Promise<{ kind: 'Success'; result: T } | { kind: 'IsRestarting' }> = async () => ({
+            kind: 'Success',
+            result: await action(),
+        })
+        for (const c of this.clients.values()) {
+            const previousCombinedAction = combinedAction
+            combinedAction = async () => {
+                const r = await c.withStoppedClient(previousCombinedAction)
+                if (r.kind === 'IsRestarting' || r.result.kind === 'IsRestarting') {
+                    return { kind: 'IsRestarting' }
+                }
+                return { kind: 'Success', result: r.result.result }
+            }
+        }
+        return combinedAction()
+    }
+
     getClientForFolder(folder: ExtUri): LeanClient | undefined {
         return this.clients.get(folder.toString())
     }
@@ -268,7 +283,7 @@ export class LeanClientProvider implements Disposable {
             folderUri,
             uri,
             async (folderUriToStop: FileUri) => {
-                await this.stopClient(folderUriToStop)
+                await this.eraseClient(folderUriToStop)
                 await this.ensureClient(uri)
             },
         )
@@ -279,7 +294,7 @@ export class LeanClientProvider implements Disposable {
         }
 
         logger.log('[ClientProvider] Creating LeanClient for ' + folderUri.toString())
-        client = new LeanClient(folderUri, this.outputChannel)
+        client = await LeanClient.init(folderUri, this.outputChannel)
         this.subscriptions.push(client)
         this.clients.set(key, client)
 

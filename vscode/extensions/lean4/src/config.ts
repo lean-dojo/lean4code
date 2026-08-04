@@ -1,5 +1,4 @@
 import { ConfigurationTarget, ThemeColor, workspace } from 'vscode'
-import { elanStableChannel } from './utils/elan'
 import { PATH } from './utils/envPath'
 
 function processConfigColor(c: string): ThemeColor | string {
@@ -40,12 +39,52 @@ export function serverArgs(): string[] {
     return workspace.getConfiguration('lean4').get('serverArgs', [])
 }
 
-export function serverLoggingEnabled(): boolean {
-    return workspace.getConfiguration('lean4.serverLogging').get('enabled', false)
+export function isLoggingEnabled(): boolean {
+    return workspace.getConfiguration('lean4.logging').get('enabled', false)
 }
 
-export function serverLoggingPath(): string {
-    return workspace.getConfiguration('lean4.serverLogging').get('path', '.')
+export function loggingDir(): string {
+    return workspace.getConfiguration('lean4.logging').get('dir', '.')
+}
+
+export function allowedLoggingMethods(): string[] {
+    return workspace
+        .getConfiguration('lean4.logging')
+        .get('allowedMethods', [
+            'textDocument/didOpen',
+            'textDocument/didChange',
+            'textDocument/didClose',
+            'textDocument/didSave',
+            'textDocument/hover',
+            'textDocument/documentHighlight',
+            'completionItem/resolve',
+            'codeAction/resolve',
+            'textDocument/definition',
+            'textDocument/declaration',
+            'textDocument/typeDefinition',
+            'textDocument/references',
+            'textDocument/prepareCallHierarchy',
+            'callHierarchy/incomingCalls',
+            'callHierarchy/outgoingCalls',
+            '$/lean/prepareModuleHierarchy',
+            '$/lean/moduleHierarchy/imports',
+            '$/lean/moduleHierarchy/importedBy',
+            'textDocument/prepareRename',
+            'textDocument/rename',
+            'workspace/symbol',
+            '$/lean/rpc/call',
+            'Lean.Widget.getInteractiveDiagnostics',
+            'Lean.Widget.getInteractiveGoals',
+            'Lean.Widget.getInteractiveTermGoal',
+            'Lean.Widget.InteractiveDiagnostics.infoToInteractive',
+            'Lean.Widget.getGoToLocation',
+            'Lean.Widget.lazyTraceChildrenToInteractive',
+            'Lean.Widget.highlightMatches',
+        ])
+}
+
+export function disallowedLoggingMethods(): string[] {
+    return workspace.getConfiguration('lean4.logging').get('disallowedMethods', [])
 }
 
 export function shouldAutofocusOutput(): boolean {
@@ -126,8 +165,8 @@ export function getInfoViewShowTooltipOnHover(): boolean {
     return workspace.getConfiguration('lean4.infoview').get('showTooltipOnHover', true)
 }
 
-export function getElaborationDelay(): number {
-    return workspace.getConfiguration('lean4').get('elaborationDelay', 200)
+export function getInfoViewMessageOrder(): 'Sort by proximity to text cursor' | 'Sort by message location' {
+    return workspace.getConfiguration('lean4.infoview').get('messageOrder', 'Sort by proximity to text cursor')
 }
 
 export function shouldShowSetupWarnings(): boolean {
@@ -172,12 +211,6 @@ export function isRunningTest(): boolean {
 
 export function getTestFolder(): string {
     return typeof process.env.LEAN4_TEST_FOLDER === 'string' ? process.env.LEAN4_TEST_FOLDER : ''
-}
-
-export function getDefaultLeanVersion(): string {
-    return typeof process.env.DEFAULT_LEAN_TOOLCHAIN === 'string'
-        ? process.env.DEFAULT_LEAN_TOOLCHAIN
-        : elanStableChannel
 }
 
 /** The editor line height, in pixels. */
