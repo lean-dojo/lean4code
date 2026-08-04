@@ -35,7 +35,7 @@ You can find the most recently compiled, prebuilt release of Lean4Code under the
 
 <ol>
   <li>Clone the repo
-    <pre><code>git clone https://github.com/wadkisson/lean4code
+    <pre><code>git clone https://github.com/lean-dojo/lean4code
 cd lean4code</code></pre>
   </li>
 
