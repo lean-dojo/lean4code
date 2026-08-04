@@ -59,9 +59,14 @@ jobs:
 
       - name: Confirm packaged app exists
         run: |
-          APP_PATH=$(find vscode/.build -maxdepth 3 -iname "*.app" | head -1)
+          # gulp's darwin build places the packaged app one level ABOVE the
+          # vscode/ source folder, e.g. VSCode-darwin-arm64/Lean4Code.app at
+          # the repo root, not inside vscode/.build/. Search there instead.
+          APP_PATH=$(find . -maxdepth 2 -iname "VSCode-darwin-*" -type d -exec find {} -maxdepth 1 -iname "*.app" \; | head -1)
           if [ -z "$APP_PATH" ]; then
             echo "::error::No .app bundle found after build. Packaging silently failed."
+            echo "Repo root contents for debugging:"
+            ls -la
             exit 1
           fi
           echo "Found packaged app at: $APP_PATH"
