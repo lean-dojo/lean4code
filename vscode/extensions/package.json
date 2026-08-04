@@ -4,17 +4,19 @@
   "license": "MIT",
   "description": "Dependencies shared by all extensions",
   "dependencies": {
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "@vscode-elements/elements": "^1.7.1",
+    "@vscode/codicons": "^0.0.36"
   },
   "scripts": {
     "postinstall": "node ./postinstall.mjs"
   },
-"dependencies": {
-  "typescript": "^5.8.3",
-  "@vscode-elements/elements": "^1.7.1",
-  "@vscode/codicons": "^0.0.36"
-},
   "overrides": {
     "node-gyp-build": "4.8.1"
+  },
+  "devDependencies": {
+    "@parcel/watcher": "2.5.1",
+    "esbuild": "^0.25.0",
+    "vscode-grammar-updater": "^1.1.0"
   }
 }

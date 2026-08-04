@@ -93,6 +93,11 @@ declare module 'vscode' {
 	export namespace lm {
 
 		export function registerChatModelProvider(id: string, provider: LanguageModelChatProvider, metadata: ChatResponseProviderMetadata): Disposable;
+
+		/**
+		 * Back-compat alias for {@link registerChatModelProvider}.
+		 */
+		export function registerLanguageModelChatProvider(id: string, provider: LanguageModelChatProvider, metadata?: ChatResponseProviderMetadata): Disposable;
 	}
 
 }

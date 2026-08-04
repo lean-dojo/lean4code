@@ -37,8 +37,8 @@
 	],
   
 	"exclude": [
-	  "extensions/**/node_modules/@types/vscode",
-	  "node_modules/@types/vscode"
+	  "../extensions/**/node_modules/@types/vscode",
+	  "../node_modules/@types/vscode"
 	]
   }
   

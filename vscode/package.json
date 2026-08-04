@@ -20,7 +20,7 @@
   "scripts": {
     "build-extensions": "cd extensions/lean4dojo-panel && npm install && npm run compile && cd ../leancopilot-panel && npm install && npm run compile && cd ../tars-panel && npm install && npm run compile && cd ../lean4 && npm install && npm run build",
     "test": "echo \"Lean4Code: test infrastructure removed (standalone fork).\"",
-    "preinstall": "npm install --save-dev @types/vscode && echo 'ran npm install --save-dev @types/vscode successfully' && node build/npm/preinstall.js",
+    "preinstall": "node build/npm/preinstall.js",
     "postinstall": "node build/npm/postinstall.js && npm run build-extensions",
     "compile": "node ./node_modules/gulp/bin/gulp.js compile",
     "watch": "npm-run-all -lp watch-client watch-extensions",
@@ -132,7 +132,7 @@
     "@types/sinon": "^10.0.2",
     "@types/sinon-test": "^2.4.2",
     "@types/trusted-types": "^1.0.6",
-    "@types/vscode": "^1.125.0",
+    "@types/vscode": "1.100.0",
     "@types/vscode-notebook-renderer": "^1.72.0",
     "@types/webpack": "^5.28.5",
     "@types/wicg-file-system-access": "^2020.9.6",

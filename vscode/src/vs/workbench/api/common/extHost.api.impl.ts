@@ -293,7 +293,7 @@ export function createApiFactoryAndRegisterActors(accessor: ServicesAccessor): I
 		const authentication: typeof vscode.authentication = {
 			getSession: ((
 				providerId: string,
-				scopeListOrRequest: readonly string[] | vscode.AuthenticationWwwAuthenticateRequest,
+				scopeListOrRequest: readonly string[] | vscode.AuthenticationWWWAuthenticateRequest,
 				options?: vscode.AuthenticationGetSessionOptions
 			) => {
 				let scopes: readonly string[];
