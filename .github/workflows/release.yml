@@ -1,0 +1,127 @@
+name: Release (unsigned)
+
+# Builds Lean4Code and publishes it as a downloadable GitHub Release.
+#
+# This produces an UNSIGNED, NOT NOTARIZED macOS build. Users will see a
+# Gatekeeper "unidentified developer" warning on first launch and need to
+# either right-click -> Open, or run:
+#   xattr -rd com.apple.quarantine /path/to/Lean4Code.app
+# (this is already documented in the repo's own README under "Mac Users").
+#
+# A properly signed/notarized release needs an Apple Developer Program
+# certificate added as repo secrets (CERTIFICATE_P12,
+# CERTIFICATE_OSX_P12_PASSWORD, plus notarization credentials) and is a
+# separate, later workflow, this one is intentionally simple.
+
+on:
+  push:
+    tags:
+      - 'v*'          # push a tag like v1.0.0 to trigger a release automatically
+  workflow_dispatch:   # or trigger manually from the Actions tab, any time
+    inputs:
+      tag_name:
+        description: 'Release tag to create (e.g. v1.0.0). Leave blank to auto-generate from date.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write   # needed to create a Release and upload assets
+
+jobs:
+  build-and-release:
+    runs-on: macos-14   # Apple Silicon runner, matches vscode-darwin-arm64
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read Node version from .nvmrc
+        id: nvmrc
+        run: echo "node_version=$(cat vscode/.nvmrc)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.nvmrc.outputs.node_version }}
+
+      - name: npm install
+        working-directory: vscode
+        run: npm install
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+          # Several packages (@vscode/ripgrep, @parcel/watcher, etc.) download
+          # prebuilt binaries from api.github.com during postinstall.
+          # Unauthenticated requests to that API are rate-limited hard (60/hr)
+          # and GitHub Actions runners share IP pools that often exceed it,
+          # causing 403s. Passing the built-in GITHUB_TOKEN authenticates
+          # those requests and raises the limit dramatically.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build (gulp vscode-darwin-arm64)
+        working-directory: vscode
+        run: npx gulp vscode-darwin-arm64
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+          # Same rate-limit reasoning as above: this stage downloads
+          # marketplace extensions directly from GitHub and re-runs npm
+          # install inside several extension subfolders.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Locate the built app
+        id: app
+        run: |
+          # gulp's darwin build places the packaged app one level ABOVE the
+          # vscode/ source folder, e.g. VSCode-darwin-arm64/Lean4Code.app at
+          # the repo root, not inside vscode/.build/.
+          APP_PATH=$(find . -maxdepth 2 -iname "VSCode-darwin-*" -type d -exec find {} -maxdepth 1 -iname "*.app" \; | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::No .app bundle found after build."
+            echo "Repo root contents for debugging:"
+            ls -la
+            exit 1
+          fi
+          echo "Found: $APP_PATH"
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+          echo "app_name=$(basename "$APP_PATH")" >> "$GITHUB_OUTPUT"
+
+      - name: Strip quarantine flag before zipping
+        run: xattr -rd com.apple.quarantine "${{ steps.app.outputs.app_path }}" || true
+
+      - name: Zip the app
+        id: zip
+        run: |
+          cd "$(dirname "${{ steps.app.outputs.app_path }}")"
+          ZIP_NAME="Lean4Code-darwin-arm64.zip"
+          ditto -c -k --sequesterRsrc --keepParent "${{ steps.app.outputs.app_name }}" "$ZIP_NAME"
+          echo "zip_path=$(pwd)/$ZIP_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="build-$(date +%Y%m%d-%H%M%S)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release and upload the zip
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Lean4Code ${{ steps.tag.outputs.tag }}
+          body: |
+            Lean4Code build for macOS (Apple Silicon).
+
+            **This build is not signed or notarized.** On first launch, macOS
+            Gatekeeper may block it. To open it:
+            1. Right-click the app -> Open, and confirm, OR
+            2. Run in Terminal: `xattr -rd com.apple.quarantine /path/to/Lean4Code.app`
+
+            Built from commit ${{ github.sha }}.
+          files: ${{ steps.zip.outputs.zip_path }}
+          draft: false
+          prerelease: false
