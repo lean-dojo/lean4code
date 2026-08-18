@@ -82,6 +82,9 @@ jobs:
     needs: [check-leandojo-v2, check-leancopilot]
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - name: Open or update tracking issue if anything broke
         if: needs.check-leandojo-v2.outputs.external_api_ok == 'false' || needs.check-leancopilot.outputs.lakefile_ok == 'false'
