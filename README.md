@@ -31,6 +31,16 @@ You can find the most recently compiled, prebuilt release of Lean4Code under the
 </ul>
 <p>And we’re still working on new features!</p>
 
+<h2>Download instructions</h2>
+
+<p>
+Check out the releases tab to the right of this page and open the latest release. Download the archive for your system (for example <code>Lean4Code-darwin-arm64.zip</code> on Apple Silicon), unzip it, and open <code>Lean4Code.app</code>.
+</p>
+
+<p>
+MacOS GateKeeper automatically puts a quarantine on all apps it doesn't recognize. To remove Lean4Code's quarantine, and start using the app, run this terminal command, where "path" refers to wherever you have Lean4Code stored: "xattr -rd com.apple.quarantine path/Lean4Code.app"
+</p>
+
 <h2>Build instructions</h2>
 
 <ol>
